@@ -1,0 +1,153 @@
+win_updater:
+  width: 377
+  height: 682
+  Xtl: 772
+  Ytl: 199
+  ptxt: ""
+  children: {}
+win_logon:
+  width: 377
+  height: 682
+  Xtl: 772
+  Ytl: 199
+  ptxt: ""
+  children:
+    ledit_userid:
+      width: 333
+      height: 43
+      Xtl: 20
+      Ytl: 168
+      ptxt: ""
+    ledit_pword:
+      width: 334
+      height: 45
+      Xtl: 20
+      Ytl: 171
+      ptxt: ""
+win_main:
+  width: 1190
+  height: 1080
+  Xtl: 730
+  Ytl: 0
+  ptxt: ""
+  children:
+    btn_main_exit:
+      width: 32
+      height: 16
+      Xtl: 1151
+      Ytl: 9
+      ptxt: "X"
+      children: {}
+    tab_scan:
+      width: 43
+      height: 20
+      Xtl: 180
+      Ytl: 49
+      ptxt: ""
+      children:
+        btn_scan:
+          width: 47
+          height: 23
+          Xtl: 952
+          Ytl: 216
+          ptxt: "Scan"
+          children: {}
+        btn_query_menu:
+          width: 34
+          height: 18
+          Xtl: 973
+          Ytl: 44
+          ptxt: ""
+          children:
+            pick_load_query:
+              width: 184
+              height: 23
+              Xtl: -153
+              Ytl: 51
+              ptxt: "Load scan query"
+              children:
+                pick_personal_query:
+                  width: 240
+                  height: 23
+                  Xtl: -242
+                  Ytl: 0
+                  ptxt: "Personal"
+                  children:
+                    pick_scan50_data:
+                      width: 156
+                      height: 23
+                      Xtl: 242
+                      Ytl: 96
+                      ptxt: "scan050_data"
+                      children: {}
+                pick_public_query:
+                  width: 240
+                  height: 23
+                  Xtl: -242
+                  Ytl: 24
+                  ptxt: "Public"
+                  children:
+                    pick_pct_gainers:
+                      width: 237
+                      height: 23
+                      Xtl: -239
+                      Ytl: 0
+                      ptxt: "% Change Gainers"
+                      children: {}
+        btn_action_menu:
+          width: 34
+          height: 20
+          Xtl: 973
+          Ytl: 21
+          ptxt: ""
+          children:
+            pick_export:
+              width: 164
+              height: 23
+              Xtl: -133
+              Ytl: 170
+              ptxt: "Export"
+              children:
+                pick_to_file:
+                  width: 152
+                  height: 23
+                  Xtl: -154
+                  Ytl: 0
+                  ptxt: "To file..."
+                  children: {}
+        ocr_MyR_5:
+          width: 56
+          height: 141
+          Xtl: 32
+          Ytl: 272
+          ptxt: ""
+          children: {}
+win_saver:
+  width: 960
+  height: 540
+  Xtl: 0
+  Ytl: 0
+  ptxt: ""
+  children:
+    ledit_fname:
+      width: 795
+      height: 16
+      Xtl: 136
+      Ytl: 389
+      ptxt: ""
+      children: {}
+    btn_save_file:
+      width: 85
+      height: 23
+      Xtl: 748
+      Ytl: 490
+      ptxt: "Save"
+      children: {}
+    btn_save_cancel:
+      width: 85
+      height: 23
+      Xtl: 848
+      Ytl: 490
+      ptxt: "Cancel"
+      children: {}
+

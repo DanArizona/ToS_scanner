@@ -1,0 +1,2 @@
+set PUSHOVER_APP_TOKEN=azyu5mm6kxpyxg9iaof5z7yf43ygsr
+set PUSHOVER_USER_KEY=ue4tv96tgm98h2aa7ibdapsue6trex
