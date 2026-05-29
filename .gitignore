@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+
+# VS Code
+.vscode/
+
+# Runtime output
+runtime/
+logs/
+capture/
+captures/
+*.log
+
+# Temporary / local notes
+_DEV_NOTES.txt
+_dev_archive/
+*.old
+
+# Generated binaries
+*.exe
+*.dll
+*.obj
+*.o
+
+# Large local/generated files
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.pdf
+*.odt
+*.ods
+*.odp
+*.onepkg
