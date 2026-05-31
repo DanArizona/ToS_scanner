@@ -39,3 +39,4 @@ _dev_archive/
 *.odp
 *.onepkg
 test_widget_tree_v2_output.txt
+tmp/*
