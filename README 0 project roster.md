@@ -1,4 +1,11 @@
+The canonical pseudo-widget layout for the scanner is:
 
+    layout_scanner3_v1p0.yaml
+
+Both ToS_scanner and ToS_gui_survey should access this file through
+MB_PWIDGET_YAML using the mb_tools configuration precedence model:
+
+    local .env > Windows environment > mb_tools defaults.env
 
 
 ## Latest YAML file: &emsp; layout_4real9.yaml &emsp; 2026-03-20
