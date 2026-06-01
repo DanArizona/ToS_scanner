@@ -345,12 +345,12 @@ def main() -> int:
     app = QApplication([])
 
     controller = ToSDebugController(
-        layout_path=cfg.WIDGET_STACK_YAML,
+        layout_path=cfg.pwidget_yaml_path,
         cfg=cfg,
         logger=logger,
     )
 
-    target_dir = Path(cfg.MKTBOT_SCANS)
+    target_dir = cfg.scans_path
 
     panel = DebugPanel(
         controller=controller,

@@ -273,12 +273,12 @@ def main() -> int:
     app.setQuitOnLastWindowClosed(False)
 
     controller = ToSDebugController(
-        layout_path=cfg.WIDGET_STACK_YAML,
+        layout_path=cfg.pwidget_yaml_path,
         cfg=cfg,
         logger=logger,
     )
 
-    target_dir = Path(cfg.MKTBOT_SCANS)
+    target_dir = cfg.scans_path
 
     menu_app = DebugMenuApp(
         controller=controller,

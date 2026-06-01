@@ -53,12 +53,12 @@ def main() -> int:
     logger = setup_logger(log_dir)
 
     controller = ToSDebugController(
-        layout_path=cfg.WIDGET_STACK_YAML,
+        layout_path=cfg.pwidget_yaml_path,
         cfg=cfg,
         logger=logger,
     )
 
-    target_dir = Path(cfg.MKTBOT_SCANS)
+    target_dir = cfg.scans_path
 
     logger.info("Debug hotkeys active:")
     logger.info("  Ctrl+Shift+1   open_scan_tab")

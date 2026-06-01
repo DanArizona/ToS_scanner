@@ -44,7 +44,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config import WindowConfig
+from config import ScannerConfig, load_scanner_config
 from layout import load_widget_layout
 from tos_debug_actions import ToSDebugController
 
@@ -381,8 +381,8 @@ def get_matching_window(title_prefix: str):
     return None
 
 
-def validate_win_main_open(logger: logging.Logger, cfg: WindowConfig):
-    title_prefix = cfg.WINDOW_TOS_MAIN
+def validate_win_main_open(logger: logging.Logger, cfg: ScannerConfig):
+    title_prefix = cfg.window_tos_main
     win = get_matching_window(title_prefix)
 
     if win is None:
@@ -441,7 +441,7 @@ def extract_expected_size_from_layout(layout, widget_name: str) -> tuple[int, in
 
 def validate_win_main_size(
     logger: logging.Logger,
-    cfg: WindowConfig,
+    cfg: ScannerConfig,
     layout,
     win_main_window,
 ) -> None:
@@ -489,7 +489,7 @@ def validate_output_dir_access(logger: logging.Logger, output_dir: Path) -> None
 
 def run_startup_checks(
     logger: logging.Logger,
-    cfg: WindowConfig,
+    cfg: ScannerConfig,
     layout_path: Optional[Path],
     output_dir: Path,
 ) -> None:
@@ -503,7 +503,7 @@ def run_startup_checks(
         )
 
     try:
-        layout = load_widget_layout(layout_path, cfg.TITLE_MAP)
+        layout = load_widget_layout(layout_path, cfg.title_map)
     except Exception as exc:
         raise StartupValidationError(
             f"Could not load layout YAML '{layout_path}': {exc}"
@@ -825,7 +825,7 @@ class ToSPseudoWidgetExporter:
         self,
         *,
         logger: logging.Logger,
-        cfg: WindowConfig,
+        cfg: ScannerConfig,
         layout_path: Optional[Path] = None,
         dry_run: bool = False,
         verify_timeout_s: float = 10.0,
@@ -836,7 +836,7 @@ class ToSPseudoWidgetExporter:
         self.verify_timeout_s = verify_timeout_s
 
         self.controller = ToSDebugController(
-            layout_path=layout_path or cfg.WIDGET_STACK_YAML,
+            layout_path=layout_path or cfg.pwidget_yaml_path,
             cfg=cfg,
             logger=logger,
         )
@@ -1112,7 +1112,7 @@ class ScanControlManager:
         self,
         *,
         args: argparse.Namespace,
-        cfg: WindowConfig,
+        cfg: ScannerConfig,
         logger: logging.Logger,
     ) -> None:
         self.args = args
@@ -1120,8 +1120,8 @@ class ScanControlManager:
         self.logger = logger
 
         script_dir = Path(__file__).resolve().parent
-        self.layout_path = args.layout_path or (script_dir / cfg.WIDGET_STACK_YAML)
-        self.output_dir = args.output_dir or Path(cfg.MKTBOT_SCANS)
+        self.layout_path = args.layout_path or cfg.pwidget_yaml_path
+        self.output_dir = args.output_dir or cfg.scans_path
 
         self.bridge = ManagerBridge()
 
@@ -1778,7 +1778,7 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=None,
-        help="Directory for CSV files; defaults to WindowConfig.MKTBOT_SCANS",
+        help="Directory for CSV files; defaults to MB_SCANS",
     )
     parser.add_argument(
         "--log-dir",
@@ -1796,7 +1796,7 @@ def parse_args() -> argparse.Namespace:
         "--layout-path",
         type=Path,
         default=None,
-        help="Optional layout file for pseudo-widget definitions; defaults to WindowConfig.WIDGET_STACK_YAML",
+        help="Optional layout file for pseudo-widget definitions; defaults to MB_PWIDGET_YAML",
     )
     parser.add_argument(
         "--verify-timeout",
@@ -1818,7 +1818,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    cfg = WindowConfig()
+    cfg = load_scanner_config()
 
     logger, listener = build_logger(args.log_dir)
     listener.start()
@@ -1828,12 +1828,13 @@ def main() -> int:
     try:
         logger.info("========================================================")
         logger.info("scan_main.py startup")
-        logger.info("output_dir=%s", args.output_dir or Path(cfg.MKTBOT_SCANS))
+        logger.info("output_dir=%s", args.output_dir or cfg.scans_path)
         logger.info("log_dir=%s", args.log_dir)
         logger.info("state_file=%s", args.state_file)
-        logger.info("layout_path=%s", args.layout_path or Path(cfg.WIDGET_STACK_YAML))
+        # logger.info("layout_path=%s", args.layout_path or Path(cfg.pwidget_yaml_path))
+        logger.info("layout_path=%s", args.layout_path or cfg.pwidget_yaml_path)
         logger.info("dry_run=%s", args.dry_run)
-        logger.info("WINDOW_TOS_MAIN prefix=%s", cfg.WINDOW_TOS_MAIN)
+        logger.info("window_tos_main prefix=%s", cfg.window_tos_main)
 
         manager = ScanControlManager(
             args=args,
