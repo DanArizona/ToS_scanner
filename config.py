@@ -1,62 +1,216 @@
 # config.py
+"""
+ToS_scanner configuration adapter.
+
+Rules:
+    - mb_tools.config owns environment loading and precedence.
+    - MB_* variables are canonical.
+    - This file maps MB_* values into scanner-friendly Python names.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
-import os
-from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+from mb_tools.config import load_mb_config
 
-@dataclass
-class WindowConfig:
-    WINDOW_TOS: str = os.getenv("WINDOW_TOS", "thinkorswim")
-    WINDOW_TOS_MAIN: str = os.getenv("WINDOW_TOS_MAIN", "Main@thinkorswim")
-    WINDOW_TOS_UPDATE: str = os.getenv("WINDOW_TOS_UPDATE", "thinkorswim updater")
-    WINDOW_TOS_LOGON: str = os.getenv("WINDOW_TOS_LOGON", "Logon to thinkorswim")
-    WINDOW_TOS_EXPORT: str = os.getenv("WINDOW_TOS_EXPORT", "Watchlist Scanner")
-    WINDOW_TOS_WL_MAIN: str = os.getenv("WINDOW_TOS_WL_MAIN", "Watchlist Main@thinkorswim")
-    WINDOW_TOS_WL_EXPORT: str = os.getenv("WINDOW_TOS_WL_EXPORT", "Watchlist 'Default'")
-    WINDOW_TOS_WL_SYMBOLS: str = os.getenv("WINDOW_TOS_WL_SYMBOLS", "Symbols import")
-    
-    WINDOW_ALL_MAX_DIMS_ERR: int = int(os.getenv("WINDOW_ALL_MAX_DIMS_ERR", 4))
-    WINDOW_MAIN_REF_WIDTH: int = int(os.getenv("WINDOW_MAIN_REF_WIDTH", 1190))
-    WINDOW_MAIN_REF_HEIGHT: int = int(os.getenv("WINDOW_MAIN_REF_HEIGHT", 1080))
-    TARGET_FOLDER: str = os.getenv("TARGET_FOLDER", r"\\MASTERBOT\ToS_scans\scanner_survey")
-#    WIDGET_STACK_YAML: str = os.getenv("WIDGET_STACK_YAML", "layout.yaml")
-    WIDGET_STACK_YAML: str = os.getenv("WIDGET_STACK_YAML", "layout_scanner3_v1p0.yaml")
-    
-    MKTBOT_SCANS: str = os.getenv("MKTBOT_SCANS", r"C:\Users\DanLa\Documents\github\stockScans")
-    MKTBOT_VAULT: str = os.getenv("MKTBOT_VAULT", r"C:\Users\DanLa\MBV")
 
-#    title_map = {
-#        "win_main": WINDOW_TOS_MAIN,
-#        "win_logon": WINDOW_TOS_LOGON,
-#        "win_updater": WINDOW_TOS_UPDATE,
-#        "win_saver": WINDOW_TOS_SAVER
-#    }
+@dataclass(frozen=True)
+class ScannerConfig:
+    # ThinkOrSwim window title / title-match settings
+    window_tos: str
+    window_tos_main: str
+    window_tos_update: str
+    window_tos_logon: str
+    window_tos_export: str
+    window_tos_wl_main: str
+    window_tos_wl_export_match: str
+    window_tos_wl_symbols: str
 
-    title_map = {
-        "win_main": WINDOW_TOS_MAIN,
-        "win_logon": WINDOW_TOS_LOGON,
-        "win_updater": WINDOW_TOS_UPDATE,
-        "win_export": WINDOW_TOS_EXPORT,
-        "win_wl_main": WINDOW_TOS_WL_MAIN,
-        "win_wl_symbols": WINDOW_TOS_WL_SYMBOLS,
-        "win_wl_export": WINDOW_TOS_WL_EXPORT,
-    }
+    # Window validation
+    win_all_max_dims_err: int
+    win_main_ref_width: int
+    win_main_ref_height: int
 
-    def print_cfg(self):
-        # pass
-        print("WINDOW_TOS:              " + self.WINDOW_TOS )
-        print("WINDOW_TOS_MAIN:         " + self.WINDOW_TOS_MAIN )
-        print("WINDOW_TOS_UPDATE:       " + self.WINDOW_TOS_UPDATE )
-        print("WINDOW_TOS_LOGON:        " + self.WINDOW_TOS_LOGON )
-        print("WINDOW_TOS_EXPORT:       " + self.WINDOW_TOS_EXPORT )
-        print("WINDOW_TOS_WL_MAIN:      " + self.WINDOW_TOS_WL_MAIN )
-        print("WINDOW_TOS_WL_EXPORT:    " + self.WINDOW_TOS_WL_EXPORT )
-        print("WINDOW_TOS_WL_SYMBOLS:   " + self.WINDOW_TOS_WL_SYMBOLS )
-        print("WINDOW_ALL_MAX_DIMS_ERR: " + repr(self.WINDOW_ALL_MAX_DIMS_ERR ))
-        print("WINDOW_MAIN_REF_WIDTH:   " + repr(self.WINDOW_MAIN_REF_WIDTH ))
-        print("WINDOW_MAIN_REF_HEIGHT:  " + repr(self.WINDOW_MAIN_REF_HEIGHT ))
-        print("TARGET_FOLDER:           " + self.TARGET_FOLDER )
-        print("WIDGET_STACK_YAML:       " + self.WIDGET_STACK_YAML )
-        print("MKTBOT_SCANS:            " + self.MKTBOT_SCANS )
-        print("MKTBOT_VAULT:            " + self.MKTBOT_VAULT )
+    # Files / directories
+    pwidget_yaml: str
+    scans_dir: str
+    lan_scans_dir: str
+    vault_dir: str
+    log_folder: str
+
+    @property
+    def pwidget_yaml_path(self) -> Path:
+        return Path(self.pwidget_yaml).expanduser()
+
+    @property
+    def scans_path(self) -> Path:
+        return Path(self.scans_dir).expanduser()
+
+    @property
+    def lan_scans_path(self) -> Path:
+        return Path(self.lan_scans_dir).expanduser()
+
+    @property
+    def vault_path(self) -> Path:
+        return Path(self.vault_dir).expanduser()
+
+    @property
+    def log_folder_path(self) -> Path:
+        return Path(self.log_folder).expanduser()
+
+    @property
+    def title_map(self) -> dict[str, str]:
+        return {
+            "win_main": self.window_tos_main,
+            "win_logon": self.window_tos_logon,
+            "win_updater": self.window_tos_update,
+            "win_export": self.window_tos_export,
+            "win_wl_main": self.window_tos_wl_main,
+            "win_wl_symbols": self.window_tos_wl_symbols,
+            "win_wl_export": self.window_tos_wl_export_match,
+        }
+
+    # ------------------------------------------------------------
+    # Temporary compatibility aliases for old code.
+    # Prefer lowercase names above in new/refactored code.
+    # ------------------------------------------------------------
+
+    @property
+    def WINDOW_TOS(self) -> str:
+        return self.window_tos
+
+    @property
+    def WINDOW_TOS_MAIN(self) -> str:
+        return self.window_tos_main
+
+    @property
+    def WINDOW_TOS_UPDATE(self) -> str:
+        return self.window_tos_update
+
+    @property
+    def WINDOW_TOS_LOGON(self) -> str:
+        return self.window_tos_logon
+
+    @property
+    def WINDOW_TOS_EXPORT(self) -> str:
+        return self.window_tos_export
+
+    @property
+    def WINDOW_TOS_WL_MAIN(self) -> str:
+        return self.window_tos_wl_main
+
+    @property
+    def WINDOW_TOS_WL_EXPORT(self) -> str:
+        return self.window_tos_wl_export_match
+
+    @property
+    def WINDOW_TOS_WL_SYMBOLS(self) -> str:
+        return self.window_tos_wl_symbols
+
+    @property
+    def WINDOW_ALL_MAX_DIMS_ERR(self) -> int:
+        return self.win_all_max_dims_err
+
+    @property
+    def WINDOW_MAIN_REF_WIDTH(self) -> int:
+        return self.win_main_ref_width
+
+    @property
+    def WINDOW_MAIN_REF_HEIGHT(self) -> int:
+        return self.win_main_ref_height
+
+    @property
+    def WIDGET_STACK_YAML(self) -> str:
+        """Legacy alias. Prefer pwidget_yaml."""
+        return self.pwidget_yaml
+
+    @property
+    def TARGET_FOLDER(self) -> str:
+        """Legacy alias. Prefer scans_dir."""
+        return self.scans_dir
+
+    @property
+    def LOG_FOLDER(self) -> str:
+        """Legacy alias. Prefer log_folder."""
+        return self.log_folder
+
+    def print_cfg(self) -> None:
+        print("window_tos:                 " + self.window_tos)
+        print("window_tos_main:            " + self.window_tos_main)
+        print("window_tos_update:          " + self.window_tos_update)
+        print("window_tos_logon:           " + self.window_tos_logon)
+        print("window_tos_export:          " + self.window_tos_export)
+        print("window_tos_wl_main:         " + self.window_tos_wl_main)
+        print("window_tos_wl_export_match: " + self.window_tos_wl_export_match)
+        print("window_tos_wl_symbols:      " + self.window_tos_wl_symbols)
+
+        print("win_all_max_dims_err:       " + repr(self.win_all_max_dims_err))
+        print("win_main_ref_width:         " + repr(self.win_main_ref_width))
+        print("win_main_ref_height:        " + repr(self.win_main_ref_height))
+
+        print("pwidget_yaml:               " + self.pwidget_yaml)
+        print("pwidget_yaml_path:          " + str(self.pwidget_yaml_path))
+        print("scans_dir:                  " + self.scans_dir)
+        print("lan_scans_dir:              " + self.lan_scans_dir)
+        print("vault_dir:                  " + self.vault_dir)
+        print("log_folder:                 " + self.log_folder)
+
+
+def _get_str(mb_cfg, key: str, default: str) -> str:
+    value = mb_cfg.get(key)
+    if value in (None, ""):
+        return default
+    return str(value)
+
+
+def _get_int(mb_cfg, key: str, default: int) -> int:
+    value = mb_cfg.get(key)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def load_scanner_config() -> ScannerConfig:
+    mb_cfg = load_mb_config()
+
+    return ScannerConfig(
+        window_tos=_get_str(mb_cfg, "MB_WINDOW_TOS", "thinkorswim"),
+        window_tos_main=_get_str(mb_cfg, "MB_WINDOW_TOS_MAIN", "Main@thinkorswim"),
+        window_tos_update=_get_str(mb_cfg, "MB_WINDOW_TOS_UPDATE", "thinkorswim updater"),
+        window_tos_logon=_get_str(mb_cfg, "MB_WINDOW_TOS_LOGON", "Logon to thinkorswim"),
+        window_tos_export=_get_str(mb_cfg, "MB_WINDOW_TOS_EXPORT", "Watchlist Scanner"),
+        window_tos_wl_main=_get_str(mb_cfg, "MB_WINDOW_TOS_WL_MAIN", "Watchlist Main@thinkorswim"),
+        window_tos_wl_export_match=_get_str(mb_cfg, "MB_WINDOW_TOS_WL_EXPORT_MATCH", "Watchlist '"),
+        window_tos_wl_symbols=_get_str(mb_cfg, "MB_WINDOW_TOS_WL_SYMBOLS", "Symbols Import"),
+
+        win_all_max_dims_err=_get_int(mb_cfg, "MB_WIN_ALL_MAX_DIMS_ERR", 4),
+        win_main_ref_width=_get_int(mb_cfg, "MB_WIN_MAIN_REF_WIDTH", 1190),
+        win_main_ref_height=_get_int(mb_cfg, "MB_WIN_MAIN_REF_HEIGHT", 1080),
+
+        pwidget_yaml=_get_str(mb_cfg, "MB_PWIDGET_YAML", "layout_scanner3_v1p0.yaml"),
+        scans_dir=_get_str(mb_cfg, "MB_SCANS", r"C:\Users\DanLa\Documents\github\stockScans"),
+        lan_scans_dir=_get_str(mb_cfg, "MB_LAN_SCANS", r"\\MASTERBOT\scans"),
+        vault_dir=_get_str(mb_cfg, "MB_VAULT", r"C:\Users\DanLa\MBV"),
+        log_folder=_get_str(mb_cfg, "MB_LOG_FOLDER", r".\logs"),
+    )
+
+
+def WindowConfig() -> ScannerConfig:
+    """
+    Temporary compatibility wrapper.
+
+    Old code may still do:
+        cfg = WindowConfig()
+
+    New code should do:
+        cfg = load_scanner_config()
+    """
+    return load_scanner_config()
+
+
+if __name__ == "__main__":
+    cfg = load_scanner_config()
+    cfg.print_cfg()
