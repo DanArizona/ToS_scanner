@@ -40,6 +40,11 @@ class ScannerConfig:
     vault_dir: str
     log_folder: str
 
+    # Notifications
+    notify_enable: bool
+    notify_provider: str
+    pushover_ecfg: str
+
     @property
     def pwidget_yaml_path(self) -> Path:
         return Path(self.pwidget_yaml).expanduser()
@@ -59,6 +64,10 @@ class ScannerConfig:
     @property
     def log_folder_path(self) -> Path:
         return Path(self.log_folder).expanduser()
+
+    @property
+    def pushover_ecfg_path(self) -> Path:
+        return Path(self.pushover_ecfg).expanduser()
 
     @property
     def title_map(self) -> dict[str, str]:
@@ -157,6 +166,9 @@ class ScannerConfig:
         print("vault_dir:                  " + self.vault_dir)
         print("log_folder:                 " + self.log_folder)
 
+        print("notify_enable:              " + repr(self.notify_enable))
+        print("notify_provider:            " + self.notify_provider)
+        print("pushover_ecfg:              " + self.pushover_ecfg)
 
 def _get_str(mb_cfg, key: str, default: str) -> str:
     value = mb_cfg.get(key)
@@ -171,6 +183,21 @@ def _get_int(mb_cfg, key: str, default: int) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _get_bool(mb_cfg, key: str, default: bool = False) -> bool:
+    value = mb_cfg.get(key)
+    if value in (None, ""):
+        return default
+
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off"}:
+        return False
+
+    return default
+
 
 
 def load_scanner_config() -> ScannerConfig:
@@ -195,6 +222,15 @@ def load_scanner_config() -> ScannerConfig:
         lan_scans_dir=_get_str(mb_cfg, "MB_LAN_SCANS", r"\\MASTERBOT\scans"),
         vault_dir=_get_str(mb_cfg, "MB_VAULT", r"C:\Users\DanLa\MBV"),
         log_folder=_get_str(mb_cfg, "MB_LOG_FOLDER", r".\logs"),
+
+        notify_enable=_get_bool(mb_cfg, "MB_NOTIFY_ENABLE", False),
+        notify_provider=_get_str(mb_cfg, "MB_NOTIFY_PROVIDER", "pushover"),
+        pushover_ecfg=_get_str(
+            mb_cfg,
+            "MB_PUSHOVER_ECFG",
+            r".\secure\pushover.ecfg",
+        ),
+
     )
 
 

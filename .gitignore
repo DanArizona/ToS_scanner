@@ -28,7 +28,7 @@ _dev_archive/
 *.obj
 *.o
 
-# Large local/generated files
+# Local/generated files
 *.png
 *.jpg
 *.jpeg
@@ -40,3 +40,5 @@ _dev_archive/
 *.onepkg
 test_widget_tree_v2_output.txt
 tmp/*
+secure/
+*.ecfg
