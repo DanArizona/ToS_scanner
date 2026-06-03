@@ -73,8 +73,8 @@ def main() -> int:
     logger.info("  Ctrl+Shift+11  nop")
     logger.info("Press Esc to quit.")
 
-    hotkeys = install_debug_hotkeys(controller, make_filename, target_dir)
-    hotkeys.start()
+    hotkey_listener  = install_debug_hotkeys(controller, make_filename, target_dir)
+    hotkey_listener .start()
 
     try:
         with keyboard.Listener(
@@ -82,7 +82,7 @@ def main() -> int:
         ) as listener:
             listener.join()
     finally:
-        hotkeys.stop()
+        hotkey_listener .stop()
         logger.info("Hotkey listener stopped.")
 
     return 0
