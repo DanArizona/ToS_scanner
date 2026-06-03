@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from config import WindowConfig
+from config import load_scanner_config
 from tos_debug_actions import ToSDebugController
 
 
@@ -72,7 +72,7 @@ class DebugMenuDialog(QDialog):
             "Choose a debug action.\n"
             "This dialog closes immediately after a button is pressed."
         )
-        label.setAlignment(Qt.AlignCenter)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         outer.addWidget(label)
 
         grid = QGridLayout()
@@ -266,7 +266,7 @@ class DebugMenuApp(QObject):
 
 
 def main() -> int:
-    cfg = WindowConfig()
+    cfg = load_scanner_config()
     logger = setup_logger(Path("logs"))
 
     app = QApplication([])

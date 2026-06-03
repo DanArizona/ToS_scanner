@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
-from config import WindowConfig
+from config import load_scanner_config
 from layout import load_widget_layout
 
 
@@ -274,50 +274,10 @@ def build_tree_lines(root_name: str, root_node: Any, name_registry: dict[int, st
 
 def build_title_map() -> dict[str, str]:
     """
-    Build pseudo-window-name -> real window title map from WindowConfig.
-
-    Prefer cfg.TITLE_MAP if available, and fall back to a best-effort build.
+    Build pseudo-window-name -> real window title map from ScannerConfig.
     """
-    cfg = WindowConfig()
-
-    title_map = getattr(cfg, "TITLE_MAP", None)
-    if isinstance(title_map, dict) and title_map:
-        return dict(title_map)
-
-    fallback: dict[str, str] = {}
-
-    explicit_candidates = {
-        "win_main": ("WINDOW_TOS_MAIN", "WINDOW_MAIN"),
-        "win_logon": ("WINDOW_TOS_LOGON", "WINDOW_LOGON"),
-        "win_updater": ("WINDOW_TOS_UPDATER", "WINDOW_UPDATER", "WINDOW_TOS_UPDATE", "WINDOW_UPDATE"),
-        "win_update": ("WINDOW_TOS_UPDATE", "WINDOW_UPDATE", "WINDOW_TOS_UPDATER", "WINDOW_UPDATER"),
-        "win_saver": ("WINDOW_TOS_SAVER", "WINDOW_SAVER"),
-        "win_tos": ("WINDOW_TOS",),
-    }
-
-    for pseudo_name, attr_names in explicit_candidates.items():
-        for attr_name in attr_names:
-            value = getattr(cfg, attr_name, None)
-            if isinstance(value, str) and value.strip():
-                fallback[pseudo_name] = value
-                break
-
-    for attr_name in dir(cfg):
-        if not attr_name.startswith("WINDOW_"):
-            continue
-
-        value = getattr(cfg, attr_name, None)
-        if not isinstance(value, str) or not value.strip():
-            continue
-
-        suffix = attr_name[len("WINDOW_"):]
-        if suffix.startswith("TOS_"):
-            suffix = suffix[len("TOS_"):]
-
-        pseudo_name = f"win_{suffix.lower()}"
-        fallback.setdefault(pseudo_name, value)
-
-    return fallback
+    cfg = load_scanner_config()
+    return dict(cfg.title_map)
 
 
 def load_layout_via_project_module(yaml_path: Path, title_map: dict[str, str]) -> Any:
