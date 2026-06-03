@@ -76,11 +76,15 @@ def main() -> int:
     hotkey_listener  = install_debug_hotkeys(controller, make_filename, target_dir)
     hotkey_listener .start()
 
+    def stop_on_esc(key):
+        if key == keyboard.Key.esc:
+            return False
+        return None
+
     try:
-        with keyboard.Listener(
-            on_press=lambda key: False if key == keyboard.Key.esc else None
-        ) as listener:
+        with keyboard.Listener(on_press=stop_on_esc) as listener:  # type: ignore[arg-type]
             listener.join()
+            
     finally:
         hotkey_listener .stop()
         logger.info("Hotkey listener stopped.")
