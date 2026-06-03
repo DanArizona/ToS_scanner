@@ -13,7 +13,7 @@ from typing import Optional
 import pyautogui
 import pygetwindow as gw
 
-from config import WindowConfig
+from config import ScannerConfig, load_scanner_config
 from layout import load_widget_layout
 from models import WidgetStack
 
@@ -29,7 +29,7 @@ class ToSDebugController:
     Notes
     -----
     - Uses the layout registry returned by load_widget_layout(...)
-    - Uses WindowConfig.TITLE_MAP for root-window resolution
+    - Uses ScannerConfig.title_map for root-window resolution
     - Adds small randomized delay and cursor jitter
     - Serializes actions with a lock so actions do not overlap
     """
@@ -56,12 +56,12 @@ class ToSDebugController:
         self,
         *,
         layout_path: str | Path,
-        cfg: Optional[WindowConfig] = None,
+        cfg: Optional[ScannerConfig] = None,        
         logger=None,
     ) -> None:
-        self.cfg = cfg or WindowConfig()
+        self.cfg = cfg or load_scanner_config()        
         self.logger = logger
-        self.layout = load_widget_layout(layout_path, self.cfg.TITLE_MAP)
+        self.layout = load_widget_layout(layout_path, self.cfg.title_map)        
         self.action_lock = threading.RLock()
 
     # ------------------------------------------------------------------
@@ -116,7 +116,7 @@ class ToSDebugController:
         return None
 
     def _bring_named_window_to_front(self, widget_name: str) -> None:
-        title_prefix = self.cfg.TITLE_MAP[widget_name]
+        title_prefix = self.cfg.title_map[widget_name]
         win = self._get_matching_window(title_prefix)
         if win is None:
             raise RuntimeError(
@@ -138,7 +138,7 @@ class ToSDebugController:
         self._sleep(self.STEP_PAUSE_S)
 
     def _wait_for_window(self, widget_name: str, timeout_s: float = 2.0) -> bool:
-        title_prefix = self.cfg.TITLE_MAP[widget_name]
+        title_prefix = self.cfg.title_map[widget_name]
         deadline = time.monotonic() + timeout_s
 
         while time.monotonic() < deadline:

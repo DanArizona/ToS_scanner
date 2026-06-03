@@ -514,9 +514,91 @@ def run_startup_checks(
 # Alerts
 # ---------------------------------------------------------------------------
 
+@dataclass(frozen=True)
+class PushoverCredentials:
+    app_token: str
+    user_key: str
+
+
+def load_pushover_credentials(cfg: ScannerConfig) -> Optional[PushoverCredentials]:
+    """
+    Temporary placeholder.
+
+    Later this should read cfg.pushover_ecfg_path using mb_tools.secure_config.
+    For now, returning None means credentials are not configured.
+    """
+    return None
+
+
+# class AlertManager:
+#     def __init__(self, logger: logging.Logger) -> None:
+#         self.logger = logger
+
+#     def popup(self, title: str, message: str) -> None:
+#         try:
+#             ctypes.windll.user32.MessageBoxW(
+#                 0,
+#                 message,
+#                 title,
+#                 0x10 | 0x1000,  # MB_ICONHAND | MB_SYSTEMMODAL
+#             )
+#         except Exception as exc:
+#             self.logger.exception("Popup dialog failed: %s", exc)
+
+#     def play_alert_sound(self) -> None:
+#         try:
+#             winsound.MessageBeep(winsound.MB_ICONHAND)
+#             winsound.Beep(1200, 500)
+#             winsound.Beep(1000, 700)
+#         except Exception as exc:
+#             self.logger.exception("Alert sound failed: %s", exc)
+
+#     def send_pushover(self, title: str, message: str) -> None:
+#         app_token = os.environ.get("PUSHOVER_APP_TOKEN")
+#         user_key = os.environ.get("PUSHOVER_USER_KEY")
+
+#         if not app_token or not user_key:
+#             self.logger.warning(
+#                 "Pushover skipped: PUSHOVER_APP_TOKEN and/or PUSHOVER_USER_KEY not set."
+#             )
+#             return
+
+#         payload = urllib.parse.urlencode(
+#             {
+#                 "token": app_token,
+#                 "user": user_key,
+#                 "title": title,
+#                 "message": message,
+#                 "priority": 1,
+#             }
+#         ).encode("utf-8")
+
+#         try:
+#             req = urllib.request.Request(PUSHOVER_API_URL, data=payload, method="POST")
+#             with urllib.request.urlopen(req, timeout=10) as resp:
+#                 body = resp.read().decode("utf-8", errors="replace")
+#             self.logger.info("Pushover sent successfully. Response=%s", body)
+#         except Exception as exc:
+#             self.logger.exception("Pushover send failed: %s", exc)
+
+#     def critical(self, title: str, message: str) -> None:
+#         self.logger.critical("%s | %s", title, message)
+#         self.play_alert_sound()
+#         self.send_pushover(title, message)
+#         self.popup(title, message)
+
+
 class AlertManager:
-    def __init__(self, logger: logging.Logger) -> None:
+    def __init__(
+        self,
+        logger: logging.Logger,
+        *,
+        notifications_enabled: bool = False,
+        pushover_credentials: Optional[PushoverCredentials] = None,
+    ) -> None:
         self.logger = logger
+        self.notifications_enabled = notifications_enabled
+        self.pushover_credentials = pushover_credentials
 
     def popup(self, title: str, message: str) -> None:
         try:
@@ -538,19 +620,20 @@ class AlertManager:
             self.logger.exception("Alert sound failed: %s", exc)
 
     def send_pushover(self, title: str, message: str) -> None:
-        app_token = os.environ.get("PUSHOVER_APP_TOKEN")
-        user_key = os.environ.get("PUSHOVER_USER_KEY")
+        if not self.notifications_enabled:
+            self.logger.info("Pushover skipped: notifications are disabled.")
+            return
 
-        if not app_token or not user_key:
-            self.logger.warning(
-                "Pushover skipped: PUSHOVER_APP_TOKEN and/or PUSHOVER_USER_KEY not set."
+        if self.pushover_credentials is None:
+            self.logger.error(
+                "Pushover requested but credentials are not loaded."
             )
             return
 
         payload = urllib.parse.urlencode(
             {
-                "token": app_token,
-                "user": user_key,
+                "token": self.pushover_credentials.app_token,
+                "user": self.pushover_credentials.user_key,
                 "title": title,
                 "message": message,
                 "priority": 1,
@@ -1135,6 +1218,7 @@ class ScanControlManager:
         self.maintenance_lock = threading.Lock()
         self.maintenance_busy = False
         self.user_scan_request = UserScanRequest()
+        self.notifications_enabled = bool(cfg.notify_enable)
 
     def is_running(self) -> bool:
         return self.runner_thread is not None and self.runner_thread.is_alive()
@@ -1364,6 +1448,14 @@ class ScanControlManager:
         if self.stop_event is not None:
             self.stop_event.set()
         self.bridge.status_changed.emit("Stopping...")
+
+    def set_notifications_enabled(self, value: bool) -> None:
+        self.notifications_enabled = bool(value)
+        self.logger.info(
+            "UI | notifications_enabled changed to %s",
+            self.notifications_enabled,
+        )
+
 
 def market_is_open_now_et() -> bool:
     now_et = datetime.now(ET)
