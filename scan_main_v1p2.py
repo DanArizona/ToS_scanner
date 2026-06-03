@@ -530,64 +530,6 @@ def load_pushover_credentials(cfg: ScannerConfig) -> Optional[PushoverCredential
     return None
 
 
-# class AlertManager:
-#     def __init__(self, logger: logging.Logger) -> None:
-#         self.logger = logger
-
-#     def popup(self, title: str, message: str) -> None:
-#         try:
-#             ctypes.windll.user32.MessageBoxW(
-#                 0,
-#                 message,
-#                 title,
-#                 0x10 | 0x1000,  # MB_ICONHAND | MB_SYSTEMMODAL
-#             )
-#         except Exception as exc:
-#             self.logger.exception("Popup dialog failed: %s", exc)
-
-#     def play_alert_sound(self) -> None:
-#         try:
-#             winsound.MessageBeep(winsound.MB_ICONHAND)
-#             winsound.Beep(1200, 500)
-#             winsound.Beep(1000, 700)
-#         except Exception as exc:
-#             self.logger.exception("Alert sound failed: %s", exc)
-
-#     def send_pushover(self, title: str, message: str) -> None:
-#         app_token = os.environ.get("PUSHOVER_APP_TOKEN")
-#         user_key = os.environ.get("PUSHOVER_USER_KEY")
-
-#         if not app_token or not user_key:
-#             self.logger.warning(
-#                 "Pushover skipped: PUSHOVER_APP_TOKEN and/or PUSHOVER_USER_KEY not set."
-#             )
-#             return
-
-#         payload = urllib.parse.urlencode(
-#             {
-#                 "token": app_token,
-#                 "user": user_key,
-#                 "title": title,
-#                 "message": message,
-#                 "priority": 1,
-#             }
-#         ).encode("utf-8")
-
-#         try:
-#             req = urllib.request.Request(PUSHOVER_API_URL, data=payload, method="POST")
-#             with urllib.request.urlopen(req, timeout=10) as resp:
-#                 body = resp.read().decode("utf-8", errors="replace")
-#             self.logger.info("Pushover sent successfully. Response=%s", body)
-#         except Exception as exc:
-#             self.logger.exception("Pushover send failed: %s", exc)
-
-#     def critical(self, title: str, message: str) -> None:
-#         self.logger.critical("%s | %s", title, message)
-#         self.play_alert_sound()
-#         self.send_pushover(title, message)
-#         self.popup(title, message)
-
-
 class AlertManager:
     def __init__(
         self,
@@ -1374,7 +1316,24 @@ class ScanControlManager:
         )
 
         self.shared_state = SharedState(self.args.state_file, logger=self.logger)
-        self.alerts = AlertManager(self.logger)
+
+        # self.alerts = AlertManager(self.logger)
+        pushover_credentials: Optional[PushoverCredentials] = None
+
+        if self.notifications_enabled:
+            pushover_credentials = load_pushover_credentials(self.cfg)
+            if pushover_credentials is None:
+                raise StartupValidationError(
+                    "Pushover notifications are enabled, but credentials are not configured yet. "
+                    f"Expected encrypted credentials at: {self.cfg.pushover_ecfg_path}"
+                )
+
+        self.alerts = AlertManager(
+            self.logger,
+            notifications_enabled=self.notifications_enabled,
+            pushover_credentials=pushover_credentials,
+        )
+
         recover_previous_run(self.logger, self.shared_state)
 
         self.stop_event = threading.Event()

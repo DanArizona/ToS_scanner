@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pynput import keyboard
 
-from config import WindowConfig
+from config import load_scanner_config
 from tos_debug_actions import ToSDebugController, install_debug_hotkeys
 
 
@@ -48,7 +48,7 @@ def make_filename() -> str:
 
 
 def main() -> int:
-    cfg = WindowConfig()
+    cfg = load_scanner_config()    
     log_dir = Path("logs")
     logger = setup_logger(log_dir)
 

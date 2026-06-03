@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config import WindowConfig
+from config import load_scanner_config
 from tos_debug_actions import ToSDebugController
 
 
@@ -339,7 +339,7 @@ class DebugPanel(QWidget):
 
 
 def main() -> int:
-    cfg = WindowConfig()
+    cfg = load_scanner_config()
     logger = setup_logger(Path("logs"))
 
     app = QApplication([])
