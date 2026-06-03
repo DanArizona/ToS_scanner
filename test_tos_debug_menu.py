@@ -195,7 +195,7 @@ class DebugMenuApp(QObject):
             dlg = DebugMenuDialog()
             result = dlg.exec()
 
-            if result == QDialog.Accepted and dlg.selected_action is not None:
+            if result == QDialog.DialogCode.Accepted and dlg.selected_action is not None:                
                 action_id = dlg.selected_action
                 self.logger.info("MENU | selected action %s", action_id)
                 threading.Thread(
@@ -231,7 +231,7 @@ class DebugMenuApp(QObject):
             elif action_id == 6:
                 self.current_filename = make_filename()
                 self.logger.info("ACTION | current filename set to %s", self.current_filename)
-                self.controller.enter_filename(self.current_filename)
+                self.controller.enter_filename(self.current_filename, self.target_dir)
 
             elif action_id == 7:
                 self.controller.confirm_save()
