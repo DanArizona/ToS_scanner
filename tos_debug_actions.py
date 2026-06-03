@@ -513,3 +513,47 @@ class ToSDebugController:
             self._click()
 
             self._log("ACTION | user_scan end")
+
+
+def install_debug_hotkeys(controller: ToSDebugController, make_filename, target_dir):
+    """
+    Install manual debug hotkeys for ToSDebugController.
+
+    Returns the hotkey mapping so the caller can inspect/log it if desired.
+
+    Hotkeys:
+        Ctrl+Alt+I  manual_init
+        Ctrl+Alt+U  unlock_scan
+        Ctrl+Alt+S  user_scan
+        Ctrl+Alt+E  export_csv_file
+        Ctrl+Alt+F  enter_filename
+        Ctrl+Alt+C  confirm_save
+        Ctrl+Alt+X  cancel_export
+        Ctrl+Alt+N  nop
+    """
+    from pynput import keyboard
+
+    def enter_filename_action() -> None:
+        filename = make_filename()
+        controller.enter_filename(filename, target_dir)
+
+    hotkeys = {
+        "<ctrl>+<alt>+i": controller.manual_init,
+        "<ctrl>+<alt>+u": controller.unlock_scan,
+        "<ctrl>+<alt>+s": controller.user_scan,
+        "<ctrl>+<alt>+e": controller.export_csv_file,
+        "<ctrl>+<alt>+f": enter_filename_action,
+        "<ctrl>+<alt>+c": controller.confirm_save,
+        "<ctrl>+<alt>+x": controller.cancel_export,
+        "<ctrl>+<alt>+n": controller.nop,
+    }
+
+    listener = keyboard.GlobalHotKeys(hotkeys)
+    listener.start()
+
+    controller._log("Installed debug hotkeys:")
+    for combo in hotkeys:
+        controller._log("  %s", combo)
+
+    return listener
+
