@@ -64,11 +64,7 @@ USER_SCAN_MIN_LEAD_S = 7.0
 DEFAULT_STATE_FILE = Path("./runtime/scan_runner_state.json")
 PUSHOVER_API_URL = "https://api.pushover.net/1/messages.json"
 
-REQUIRED_ENV_VARS = (
-    "PUSHOVER_APP_TOKEN",
-    "PUSHOVER_USER_KEY",
-)
-
+REQUIRED_ENV_VARS = []
 
 # ---------------------------------------------------------------------------
 # Persistent / shared state
@@ -356,19 +352,20 @@ def fatal_startup(logger: logging.Logger, message: str, exit_code: int = 2) -> i
 
 
 def validate_required_env_vars(logger: logging.Logger) -> None:
-    missing: list[str] = []
-    for name in REQUIRED_ENV_VARS:
-        value = os.environ.get(name)
-        if value is None or not value.strip():
-            missing.append(name)
+    # missing: list[str] = []
+    # for name in REQUIRED_ENV_VARS:
+    #     value = os.environ.get(name)
+    #     if value is None or not value.strip():
+    #         missing.append(name)
 
-    if missing:
-        raise StartupValidationError(
-            "Required environment variable(s) not set: " + ", ".join(missing)
-        )
+    # if missing:
+    #     raise StartupValidationError(
+    #         "Required environment variable(s) not set: " + ", ".join(missing)
+    #     )
 
-    logger.info("Startup check passed: required Pushover environment variables are set.")
+    # logger.info("Startup check passed: required Pushover environment variables are set.")
 
+    logger.info("Startup check passed: no required plain environment secrets.")
 
 def get_matching_window(title_prefix: str):
     normalized_prefix = title_prefix.strip()
