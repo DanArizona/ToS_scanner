@@ -105,7 +105,7 @@ class DebugMenuDialog(QDialog):
 
 class HotkeyBridge(QObject):
     show_menu_requested = Signal()
-
+    quit_requested = Signal()
 
 class DebugMenuApp(QObject):
     def __init__(
@@ -133,6 +133,7 @@ class DebugMenuApp(QObject):
             keyboard.HotKey.parse("<ctrl>+<shift>+m"),
             self._on_menu_hotkey,
         )
+
         self.quit_hotkey = keyboard.HotKey(
             keyboard.HotKey.parse("<ctrl>+<shift>+q"),
             self._on_quit_hotkey,
@@ -284,6 +285,7 @@ def main() -> int:
         controller=controller,
         target_dir=target_dir,
         logger=logger,
+        app=app,
     )
 
     try:
