@@ -47,6 +47,9 @@ from PySide6.QtWidgets import (
 from config import ScannerConfig, load_scanner_config
 from layout import load_widget_layout
 from tos_debug_actions import ToSDebugController
+from getpass import getpass
+from mb_tools.secure_config.qt_ecfg_editor import get_password
+from mb_tools.secure_config import EcfgError, load_ecfg
 
 
 # ---------------------------------------------------------------------------
@@ -522,12 +525,42 @@ class PushoverCredentials:
 
 def load_pushover_credentials(cfg: ScannerConfig) -> Optional[PushoverCredentials]:
     """
-    Temporary placeholder.
+    Load encrypted Pushover credentials from cfg.pushover_ecfg_path.
 
-    Later this should read cfg.pushover_ecfg_path using mb_tools.secure_config.
-    For now, returning None means credentials are not configured.
+    Expected keys in the .ecfg file:
+        MB_PUSHOVER_APP_TOKEN
+        MB_PUSHOVER_USER_KEY
     """
-    return None
+    ecfg_path = cfg.pushover_ecfg_path
+
+    if not ecfg_path.exists():
+        return None
+
+    password = get_password(
+        title="Pushover Credentials",
+        message=f"Enter password for:\n{ecfg_path}",
+    )
+
+    if not password:
+        return None
+    
+    try:
+        secrets = load_ecfg(ecfg_path, password)
+    except EcfgError:
+        raise
+    except Exception as exc:
+        raise RuntimeError(f"Could not load Pushover credentials from {ecfg_path}") from exc
+
+    app_token = secrets.get("MB_PUSHOVER_APP_TOKEN")
+    user_key = secrets.get("MB_PUSHOVER_USER_KEY")
+
+    if not app_token or not user_key:
+        return None
+
+    return PushoverCredentials(
+        app_token=str(app_token),
+        user_key=str(user_key),
+    )
 
 
 class AlertManager:
