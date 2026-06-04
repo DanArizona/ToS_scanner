@@ -1504,6 +1504,11 @@ class ScanControlPanel(QWidget):
         mode_layout.addWidget(self.radio_production)
         mode_layout.addWidget(self.radio_debug)
 
+        self.notify_checkbox = QCheckBox("Pushover notifications")
+        self.notify_checkbox.setChecked(bool(self.manager.notifications_enabled))
+        self.notify_checkbox.toggled.connect(self.on_notify_toggled)
+        mode_layout.addWidget(self.notify_checkbox)
+
         top_row.addWidget(mode_group, stretch=0)
 
         maint_col = QVBoxLayout()
@@ -1642,9 +1647,12 @@ class ScanControlPanel(QWidget):
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(False)
         self.exit_btn.setEnabled(False)
+
         self.radio_production.setEnabled(False)
         self.radio_debug.setEnabled(False)
+        self.notify_checkbox.setEnabled(False)
         self.manual_init_btn.setEnabled(False)
+
         self.unlock_scan_btn.setEnabled(False)
         self.scan_btn.setEnabled(False)
         self.scan_status_value.setText("Stopped")
@@ -1692,11 +1700,13 @@ class ScanControlPanel(QWidget):
         if running:
             self.radio_production.setEnabled(False)
             self.radio_debug.setEnabled(False)
+            self.notify_checkbox.setEnabled(False)
             self.start_btn.setEnabled(False)
             self.stop_btn.setEnabled(True)
         else:
             self.radio_production.setEnabled(True)
             self.radio_debug.setEnabled(True)
+            self.notify_checkbox.setEnabled(True)
             self.start_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
 
@@ -1722,6 +1732,10 @@ class ScanControlPanel(QWidget):
         mode_name = "Production" if self._production_mode() else "Debug"
         self.logger.info("UI | Mode changed to %s", mode_name)
         self.refresh_dynamic_state()
+
+    @Slot(bool)
+    def on_notify_toggled(self, checked: bool) -> None:
+        self.manager.set_notifications_enabled(bool(checked))
 
     @Slot()
     def on_manual_init_clicked(self) -> None:
