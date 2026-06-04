@@ -130,12 +130,12 @@ class DebugMenuApp(QObject):
         self.bridge.quit_requested.connect(self.quit_app)
 
         self.menu_hotkey = keyboard.HotKey(
-            keyboard.HotKey.parse("<ctrl>+<shift>+m"),
+            keyboard.HotKey.parse("<ctrl>+<alt>+m"),
             self._on_menu_hotkey,
         )
 
         self.quit_hotkey = keyboard.HotKey(
-            keyboard.HotKey.parse("<ctrl>+<shift>+q"),
+            keyboard.HotKey.parse("<ctrl>+<alt>+q"),
             self._on_quit_hotkey,
         )
 
@@ -146,8 +146,8 @@ class DebugMenuApp(QObject):
         self.listener.start()
 
         self.logger.info("Debug menu app started.")
-        self.logger.info("Global trigger: Ctrl+Shift+M")
-        self.logger.info("Quit trigger:   Ctrl+Shift+Q")
+        self.logger.info("Global trigger: Ctrl+Alt+m")
+        self.logger.info("Quit trigger:   Ctrl+Alt+q")
         self.logger.info("Target directory: %s", self.target_dir)
 
     def _for_canonical(self, f):
@@ -162,11 +162,11 @@ class DebugMenuApp(QObject):
         self.quit_hotkey.release(key)
 
     def _on_menu_hotkey(self) -> None:
-        self.logger.info("HOTKEY | Ctrl+Shift+M detected")
+        self.logger.info("HOTKEY | Ctrl+Alt+m detected")
         self.bridge.show_menu_requested.emit()
 
     def _on_quit_hotkey(self) -> None:
-        self.logger.info("HOTKEY | Ctrl+Shift+Q detected")
+        self.logger.info("HOTKEY | Ctrl+Alt+q detected")
         self.bridge.quit_requested.emit()
 
     @Slot()
