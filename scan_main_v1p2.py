@@ -38,6 +38,7 @@ from config import ScannerConfig, load_scanner_config
 from layout import load_widget_layout
 from run_state import SharedState, recover_previous_run
 from scanner_logging import build_logger
+from scheduler import SchedulerFlags, is_weekday, next_slot_after, sleep_until_or_stop
 from startup_checks import StartupValidationError, fatal_startup, run_startup_checks
 from tos_debug_actions import ToSDebugController
 
@@ -61,76 +62,6 @@ DEFAULT_STATE_FILE = Path("./runtime/scan_runner_state.json")
 # Scheduling
 # ---------------------------------------------------------------------------
 
-class SchedulerFlags:
-    def __init__(self, gate_active: bool = True) -> None:
-        self._lock = threading.Lock()
-        self._gate_active = gate_active
-        self._generation = 0
-
-    def snapshot(self) -> tuple[bool, int]:
-        with self._lock:
-            return self._gate_active, self._generation
-
-    def get_gate_active(self) -> bool:
-        with self._lock:
-            return self._gate_active
-
-    def set_gate_active(self, value: bool) -> None:
-        with self._lock:
-            if self._gate_active != value:
-                self._gate_active = value
-                self._generation += 1
-
-
-def is_weekday(dt_et: datetime) -> bool:
-    return dt_et.weekday() < 5
-
-
-def next_slot_after(now_et: datetime, gate_active: bool) -> datetime:
-    """
-    Return the next slot at :05, :20, :35, :50.
-
-    If gate_active is True:
-        restrict to weekday core market session.
-    If gate_active is False:
-        run continuously on the slot cadence, regardless of market hours.
-    """
-    candidate = now_et.replace(microsecond=0) + timedelta(seconds=1)
-
-    if not gate_active:
-        while candidate.second not in SLOT_SECONDS:
-            candidate += timedelta(seconds=1)
-        return candidate
-
-    while True:
-        if is_weekday(candidate) and candidate.timetz().replace(tzinfo=None) < MARKET_OPEN:
-            candidate = candidate.replace(
-                hour=MARKET_OPEN.hour,
-                minute=MARKET_OPEN.minute,
-                second=0,
-                microsecond=0,
-            )
-
-        if (not is_weekday(candidate)) or candidate.timetz().replace(tzinfo=None) >= MARKET_CLOSE:
-            candidate = (candidate + timedelta(days=1)).replace(
-                hour=MARKET_OPEN.hour,
-                minute=MARKET_OPEN.minute,
-                second=0,
-                microsecond=0,
-            )
-            while not is_weekday(candidate):
-                candidate = (candidate + timedelta(days=1)).replace(
-                    hour=MARKET_OPEN.hour,
-                    minute=MARKET_OPEN.minute,
-                    second=0,
-                    microsecond=0,
-                )
-            continue
-
-        if candidate.second in SLOT_SECONDS:
-            return candidate
-
-        candidate += timedelta(seconds=1)
 
 def wait_while_paused(
     stop_event: threading.Event,
