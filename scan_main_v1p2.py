@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 from pynput import keyboard
 
-from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer
+from PySide6.QtCore import Slot, Qt, QTimer
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
@@ -46,6 +46,12 @@ from scan_control_state import (
     UserScanRequest,
     wait_until_dynamic,
     wait_while_paused,
+)
+from gui_support import (
+    EscapeBridge,
+    GuiLogBridge,
+    ManagerBridge,
+    QtCounterLogHandler,
 )
 
 # ---------------------------------------------------------------------------
@@ -355,31 +361,6 @@ class HeartbeatThread(threading.Thread):
 # ---------------------------------------------------------------------------
 # GUI control layer
 # ---------------------------------------------------------------------------
-
-class ManagerBridge(QObject):
-    status_changed = Signal(str)
-    running_changed = Signal(bool)
-
-
-class EscapeBridge(QObject):
-    escape_pressed = Signal()
-
-
-class GuiLogBridge(QObject):
-    log_level_seen = Signal(int)
-
-
-class QtCounterLogHandler(logging.Handler):
-    def __init__(self, bridge: GuiLogBridge) -> None:
-        super().__init__()
-        self.bridge = bridge
-
-    def emit(self, record: logging.LogRecord) -> None:
-        try:
-            self.bridge.log_level_seen.emit(int(record.levelno))
-        except Exception:
-            pass
-
 
 class ScanControlManager:
     def __init__(
