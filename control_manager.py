@@ -19,6 +19,7 @@ from scan_runner import ScanRunner
 from scheduler import ET, SchedulerFlags
 from startup_checks import StartupValidationError, run_startup_checks
 
+USER_SCAN_MIN_LEAD_S = 7.0
 
 class ScanControlManager:
     def __init__(
