@@ -287,10 +287,10 @@ class ToSDebugController:
             self._move_hv("pick_to_file")
             self._click()
 
-            if not self._wait_for_window("win_saver", timeout_s=2.0):
-                raise RuntimeError("win_saver did not appear after export path.")
+            if not self._wait_for_window("win_export", timeout_s=2.0):
+                raise RuntimeError("win_export did not appear after export path.")
 
-            self._log("GUI | win_saver detected")
+            self._log("GUI | win_export detected")
 
 
     def enter_filename(self, filename: str, target_dir: str | Path) -> None:
@@ -308,7 +308,7 @@ class ToSDebugController:
             self._log("ACTION | enter_filename -> %s", filename)
             self._log("ACTION | full save path -> %s", full_path)
 
-            self._bring_named_window_to_front("win_saver")
+            self._bring_named_window_to_front("win_export")
             self._move_center("ledit_fname")
             self._click()
             self._select_all()
@@ -323,7 +323,7 @@ class ToSDebugController:
     #     """
     #     with self.action_lock:
     #         self._log("ACTION | enter_filename -> %s", filename)
-    #         self._bring_named_window_to_front("win_saver")
+    #         self._bring_named_window_to_front("win_export")
     #         self._move_center("ledit_fname")
     #         self._click()
     #         self._select_all()
@@ -333,14 +333,14 @@ class ToSDebugController:
     def confirm_save(self) -> None:
         with self.action_lock:
             self._log("ACTION | confirm_save")
-            self._bring_named_window_to_front("win_saver")
+            self._bring_named_window_to_front("win_export")
             self._move_vh("btn_save_file")
             self._click()
 
     def cancel_export(self) -> None:
         with self.action_lock:
             self._log("ACTION | cancel_export")
-            self._bring_named_window_to_front("win_saver")
+            self._bring_named_window_to_front("win_export")
             self._move_vh("btn_save_cancel")
             self._click()
 
@@ -437,17 +437,17 @@ class ToSDebugController:
             self._move_hv("pick_to_file")
             self._click()
 
-            if self._wait_for_window("win_saver", timeout_s=2.0):
+            if self._wait_for_window("win_export", timeout_s=2.0):
                 self._log("ACTION | manual_init waiting %.1f seconds for user adjustments", user_wait_s)
                 time.sleep(user_wait_s)
 
-                if self._wait_for_window("win_saver", timeout_s=0.1):
+                if self._wait_for_window("win_export", timeout_s=0.1):
                     self._log("ACTION | manual_init cancelling still-open save dialog")
-                    self._bring_named_window_to_front("win_saver")
+                    self._bring_named_window_to_front("win_export")
                     self._move_vh("btn_save_cancel")
                     self._click()
             else:
-                self._log("WARNING | manual_init did not detect win_saver after export path")
+                self._log("WARNING | manual_init did not detect win_export after export path")
 
             self._log("ACTION | manual_init end")
 
