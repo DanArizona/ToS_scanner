@@ -1,5 +1,11 @@
 # scheduler.py
 
+"""Scheduling helpers for timed ToS scan exports.
+
+This module owns market-time scheduling constants, gate-aware slot calculation,
+and wait helpers used by the scan runner.
+"""
+
 from __future__ import annotations
 
 import threading

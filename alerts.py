@@ -1,5 +1,12 @@
 # alerts.py
 
+"""Alert and notification support for the ToS scanner.
+
+This module owns local alert behavior such as Windows popup/sound alerts and
+optional Pushover notification delivery. It also loads encrypted Pushover
+credentials from the configured .ecfg file.
+"""
+
 from __future__ import annotations
 
 import ctypes

@@ -1,5 +1,12 @@
 # scan_runner.py
 
+"""Main timed scan-runner loop.
+
+This module owns the background scan loop that waits for scheduled slots,
+coordinates pause/user-scan state, invokes the exporter, and updates persistent
+runtime state.
+"""
+
 from __future__ import annotations
 
 import logging

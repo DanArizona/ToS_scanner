@@ -1,5 +1,11 @@
 # gui_support.py
 
+"""Small Qt bridge and logging helper classes for the scanner GUI.
+
+This module contains QObject signal bridges and a logging handler used to safely
+communicate between scanner logic, logging, and the Qt control panel.
+"""
+
 from __future__ import annotations
 
 import logging

@@ -55,7 +55,8 @@ def bring_window_to_front(widget_name: str, widget_stacks: dict[str, WidgetStack
     while stack.parent:
         stack = stack.parent
 
-    search_title = title_map.get(stack.bbox.name, stack.bbox.name)
+    # search_title = title_map.get(stack.bbox.name, stack.bbox.name)
+    search_title = title_map.get(stack.name, stack.name)
     windows = gw.getWindowsWithTitle(search_title)
     if windows:
         win = windows[0]
@@ -75,8 +76,13 @@ def is_window_visible(widget_name: str, widget_stacks: dict[str, WidgetStack], t
     while stack.parent:
         stack = stack.parent
 
-    search_title = title_map.get(stack.bbox.name, stack.bbox.name)
-    titles = [title.strip().lower() for title in gw.getAllTitles() if title.strip()]
+    search_title = title_map.get(stack.name, stack.name)
+    # titles = [title.strip().lower() for title in gw.getAllTitles() if title.strip()]
+    titles = [
+        title.strip().lower()
+        for title in gw.getAllTitles()
+        if title and title.strip()
+    ]
     return any(search_title.lower() in t for t in titles)
 
 

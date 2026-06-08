@@ -1,5 +1,12 @@
 # control_panel.py
 
+"""Qt control panel for the ToS scanner.
+
+This module defines the scanner GUI, including mode selection, notification
+controls, manual actions, start/stop handling, status display, and keyboard
+escape handling.
+"""
+
 from __future__ import annotations
 
 import logging
