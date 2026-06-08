@@ -1,5 +1,12 @@
 # heartbeat.py
 
+"""Heartbeat monitoring thread for the ToS scanner.
+
+This module defines the background heartbeat thread that watches shared scan
+state for stale progress and triggers critical alerts when the runner appears
+unresponsive.
+"""
+
 from __future__ import annotations
 
 import logging

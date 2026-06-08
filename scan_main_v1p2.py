@@ -1,5 +1,13 @@
 # scan_main.py
 
+"""Entrypoint for the ToS scan manager application.
+
+This module parses command-line arguments, loads scanner configuration, creates
+the Qt application, wires together the scan control manager and control panel,
+and starts the GUI event loop. Scanner behavior is implemented in focused helper
+modules imported by this entrypoint.
+"""
+
 from __future__ import annotations
 
 import argparse

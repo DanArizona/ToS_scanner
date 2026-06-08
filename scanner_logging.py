@@ -1,5 +1,11 @@
 # scanner_logging.py
 
+"""Queue-based logging setup for the ToS scanner.
+
+This module configures console and daily rotating file logging through a logging
+queue, allowing worker threads to log safely through the main scanner logger.
+"""
+
 from __future__ import annotations
 
 import logging

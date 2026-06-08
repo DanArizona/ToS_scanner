@@ -1,9 +1,18 @@
 # models.py
 
+"""Scanner-local pseudo-widget geometry and hierarchy models.
+
+This module defines WidgetBBox for rectangular screen geometry and WidgetStack
+for named pseudo-widget nodes arranged in a parent/child hierarchy. These models
+support coordinate calculations, live root-window position lookup, simple screen
+capture/OCR diagnostics, and tree reporting for ToS GUI automation.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Union
+# from typing import Optional, Union
+from typing import Any, Optional
 import numpy as np
 import pyautogui
 import pytesseract
@@ -21,7 +30,8 @@ class WidgetBBox:
     Ytl: int
 
     @classmethod
-    def from_dataframe_row(cls, row: Union[dict, "pd.Series"]):
+    # def from_dataframe_row(cls, row: Union[dict, "pd.Series"]):
+    def from_dataframe_row(cls, row: Any) -> "WidgetBBox":
         return cls(
             width=int(row["Width"]),
             height=int(row["Height"]),
@@ -183,7 +193,12 @@ class WidgetStack:
 
         visibility_note = ""
         if self.parent is None:
-            all_titles = [title.strip().lower() for title in getAllTitles() if title.strip()]
+            # all_titles = [title.strip().lower() for title in getAllTitles() if title.strip()]
+            all_titles = [
+                title.strip().lower()
+                for title in getAllTitles()
+                if title and title.strip()
+            ]
             search_title = self.window_title or self.name
             is_visible = any(search_title.lower() in title for title in all_titles)
             visibility_note = " [VISIBLE]" if is_visible else " [HIDDEN]"

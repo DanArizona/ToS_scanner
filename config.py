@@ -1,11 +1,13 @@
 # config.py
-"""
-ToS_scanner configuration adapter.
 
-Rules:
-    - mb_tools.config owns environment loading and precedence.
-    - MB_* variables are canonical.
-    - This file maps MB_* values into scanner-friendly Python names.
+"""Configuration loading for the ToS scanner.
+
+This module defines the ScannerConfig dataclass and loads scanner settings from
+mb_tools configuration sources. The scanner uses MB_* environment variables,
+with precedence handled by mb_tools.config, to configure ThinkOrSwim window
+titles, layout paths, output folders, logging, notifications, and validation
+settings.
+
 """
 
 from __future__ import annotations

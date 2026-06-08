@@ -1,5 +1,11 @@
 # exporter.py
 
+"""Scan export implementations for the ToS scanner.
+
+This module defines the scan-export protocol and the ThinkOrSwim pseudo-widget
+exporter used to drive GUI actions or create dry-run CSV output.
+"""
+
 from __future__ import annotations
 
 import logging

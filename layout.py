@@ -1,5 +1,12 @@
 # layout.py
 
+"""Pseudo-widget layout loading for the ToS scanner.
+
+This module loads the scanner YAML layout file and converts it into widget stack
+objects used by the ToS automation layer. It provides the scanner-specific
+bridge between the canonical pseudo-widget YAML file and runtime GUI actions.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

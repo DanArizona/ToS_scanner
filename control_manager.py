@@ -1,5 +1,12 @@
 # control_manager.py
 
+"""Controller layer between the GUI and scanner runtime.
+
+This module owns the ScanControlManager, which starts and stops scan threads,
+runs maintenance actions, manages notification settings, and coordinates the
+runner, heartbeat, exporter, and shared state.
+"""
+
 from __future__ import annotations
 
 import argparse

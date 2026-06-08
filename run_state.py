@@ -1,5 +1,12 @@
 # run_state.py
 
+"""Persistent and shared runtime state for the ToS scanner.
+
+This module stores scan-loop progress, pending slot information, failure state,
+and recovery bookkeeping. State is persisted to JSON so interrupted runs can be
+detected and reconciled at startup.
+"""
+
 from __future__ import annotations
 
 import json

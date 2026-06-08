@@ -1,5 +1,11 @@
 # scan_control_state.py
 
+"""Thread-safe control state for scan execution.
+
+This module contains small coordination helpers for pause state, user-requested
+scans, and dynamic waits that can be interrupted by stop, pause, or scheduling
+state changes.
+"""
 
 from __future__ import annotations
 

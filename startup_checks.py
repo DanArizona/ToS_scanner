@@ -1,5 +1,12 @@
 # startup_checks.py
 
+"""Startup validation checks for the ToS scanner.
+
+This module verifies required runtime conditions before the scanner starts,
+including ThinkOrSwim window availability, expected main-window size, layout
+loading, and output-directory access.
+"""
+
 from __future__ import annotations
 
 import logging
