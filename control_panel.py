@@ -342,13 +342,22 @@ class ScanControlPanel(QWidget):
 
         self._refresh_counters()
 
-    @Slot()
-    def on_mode_changed(self) -> None:
-        if self.manager.is_running():
+    # @Slot()
+    # def on_mode_changed(self) -> None:
+    #     if self.manager.is_running():
+    #         return
+
+    #     mode_name = "Production" if self._production_mode() else "Debug"
+    #     self.logger.info("UI | Mode changed to %s", mode_name)
+    #     self.refresh_dynamic_state()
+
+    @Slot(bool)
+    def on_mode_changed(self, checked: bool) -> None:
+        if not checked:
             return
 
-        mode_name = "Production" if self._production_mode() else "Debug"
-        self.logger.info("UI | Mode changed to %s", mode_name)
+        mode = "Production" if self.radio_production.isChecked() else "Debug"
+        self.logger.info("UI | Mode changed to %s", mode)
         self.refresh_dynamic_state()
 
     @Slot(bool)
