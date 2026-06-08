@@ -111,7 +111,7 @@ def validate_win_main_size(
     win_main_window,
 ) -> None:
     expected_w, expected_h = extract_expected_size_from_layout(layout, "win_main")
-    tolerance_px = int(cfg.WINDOW_ALL_MAX_DIMS_ERR)
+    tolerance_px = int(cfg.win_all_max_dims_err)
 
     actual_w = int(win_main_window.width)
     actual_h = int(win_main_window.height)
