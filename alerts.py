@@ -21,6 +21,7 @@ from config import ScannerConfig
 from mb_tools.secure_config import EcfgError, load_ecfg
 from mb_tools.secure_config.qt_ecfg_editor import get_password
 
+logger = logging.getLogger(__name__)
 
 PUSHOVER_API_URL = "https://api.pushover.net/1/messages.json"
 
@@ -38,10 +39,15 @@ def load_pushover_credentials(cfg: ScannerConfig) -> Optional[PushoverCredential
     Expected keys in the .ecfg file:
       - MB_PUSHOVER_APP_TOKEN
       - MB_PUSHOVER_USER_KEY
+
+    Successful loading only proves that the .ecfg file was decrypted and the
+    expected fields were present. It does not prove that Pushover will accept
+    the token/user-key pair.
     """
     ecfg_path = cfg.pushover_ecfg_path
 
     if not ecfg_path.exists():
+        logger.info("Pushover .ecfg file not found; notifications unavailable: %s", ecfg_path)
         return None
 
     password = get_password(
@@ -50,22 +56,40 @@ def load_pushover_credentials(cfg: ScannerConfig) -> Optional[PushoverCredential
     )
 
     if not password:
+        logger.info("Pushover .ecfg password was not provided; notifications unavailable.")
         return None
 
     try:
         secrets = load_ecfg(ecfg_path, password)
-    except EcfgError:
-        raise
+    except EcfgError as exc:
+        # logger.warning(
+        #     "Pushover .ecfg could not be decrypted or parsed; "
+        #     "notifications disabled for this run. path=%s reason=%s",
+        #     ecfg_path,
+        #     exc,
+        # )
+        return None
     except Exception as exc:
-        raise RuntimeError(
-            f"Could not load Pushover credentials from {ecfg_path}"
-        ) from exc
+        logger.warning(
+            "Unexpected error while loading Pushover .ecfg; "
+            "notifications disabled for this run. path=%s reason=%s",
+            ecfg_path,
+            exc,
+        )
+        return None
 
     app_token = secrets.get("MB_PUSHOVER_APP_TOKEN")
     user_key = secrets.get("MB_PUSHOVER_USER_KEY")
 
     if not app_token or not user_key:
+        logger.warning(
+            "Pushover .ecfg decrypted, but required credential fields are missing."
+        )
         return None
+
+    logger.info(
+        "Pushover .ecfg decrypted successfully; credential delivery has not been tested."
+    )
 
     return PushoverCredentials(
         app_token=str(app_token),
