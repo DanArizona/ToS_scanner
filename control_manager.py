@@ -221,10 +221,20 @@ class ScanControlManager:
 
         if self.notifications_enabled:
             pushover_credentials = load_pushover_credentials(self.cfg)
+
             if pushover_credentials is None:
-                raise StartupValidationError(
-                    "Pushover notifications are enabled, but credentials are not configured yet. "
-                    f"Expected encrypted credentials at: {self.cfg.pushover_ecfg_path}"
+                # raise StartupValidationError(
+                #     "Pushover notifications are enabled, but credentials are not configured yet. "
+                #     f"Expected encrypted credentials at: {self.cfg.pushover_ecfg_path}"
+                # )
+                self.logger.warning(
+                    "Notifications requested, but Pushover credentials were not loaded; "
+                    "notifications disabled for this run."
+                )
+            else:
+                self.logger.info(
+                    "Pushover .ecfg decrypted successfully; "
+                    "credential delivery has not been tested."
                 )
 
         self.alerts = AlertManager(

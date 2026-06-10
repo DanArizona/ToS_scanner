@@ -38,28 +38,62 @@ class HeartbeatThread(threading.Thread):
         self.check_every_s = check_every_s
         self.fail_after_consecutive_errors = fail_after_consecutive_errors
 
+    # def run(self) -> None:
+    #     self.logger.info("Heartbeat thread started.")
+    #     while not self.stop_event.wait(self.check_every_s):
+    #         snap = self.shared_state.snapshot()
+    #         stale_for = self.shared_state.seconds_since_progress()
+
+    #         if stale_for > self.stale_after_s and not snap.critical_alert_sent:
+    #             msg = (
+    #                 f"No progress for {stale_for:.1f}s. "
+    #                 f"phase={snap.phase} pending={snap.pending_csv_path}"
+    #             )
+    #             self.shared_state.set_critical_alert_sent()
+    #             self.alerts.critical("SCAN RUNNER HEARTBEAT ALERT", msg)
+    #             self.stop_event.set()
+    #             return
+
+    #         if snap.consecutive_failures >= self.fail_after_consecutive_errors and not snap.critical_alert_sent:
+    #             msg = (
+    #                 f"Consecutive failures reached {snap.consecutive_failures}. "
+    #                 f"last_error={snap.last_error}"
+    #             )
+    #             self.shared_state.set_critical_alert_sent()
+    #             self.alerts.critical("SCAN RUNNER FAILURE ALERT", msg)
+    #             self.stop_event.set()
+    #             return
+
     def run(self) -> None:
         self.logger.info("Heartbeat thread started.")
-        while not self.stop_event.wait(self.check_every_s):
-            snap = self.shared_state.snapshot()
-            stale_for = self.shared_state.seconds_since_progress()
 
-            if stale_for > self.stale_after_s and not snap.critical_alert_sent:
-                msg = (
-                    f"No progress for {stale_for:.1f}s. "
-                    f"phase={snap.phase} pending={snap.pending_csv_path}"
-                )
-                self.shared_state.set_critical_alert_sent()
-                self.alerts.critical("SCAN RUNNER HEARTBEAT ALERT", msg)
-                self.stop_event.set()
-                return
+        try:
+            while not self.stop_event.wait(self.check_every_s):
+                snap = self.shared_state.snapshot()
+                stale_for = self.shared_state.seconds_since_progress()
 
-            if snap.consecutive_failures >= self.fail_after_consecutive_errors and not snap.critical_alert_sent:
-                msg = (
-                    f"Consecutive failures reached {snap.consecutive_failures}. "
-                    f"last_error={snap.last_error}"
-                )
-                self.shared_state.set_critical_alert_sent()
-                self.alerts.critical("SCAN RUNNER FAILURE ALERT", msg)
-                self.stop_event.set()
-                return
+                if stale_for > self.stale_after_s and not snap.critical_alert_sent:
+                    msg = (
+                        f"No progress for {stale_for:.1f}s. "
+                        f"phase={snap.phase} pending={snap.pending_csv_path}"
+                    )
+                    self.shared_state.set_critical_alert_sent()
+                    self.alerts.critical("SCAN RUNNER HEARTBEAT ALERT", msg)
+                    self.stop_event.set()
+                    return
+
+                if (
+                    snap.consecutive_failures >= self.fail_after_consecutive_errors
+                    and not snap.critical_alert_sent
+                ):
+                    msg = (
+                        f"Consecutive failures reached {snap.consecutive_failures}. "
+                        f"last_error={snap.last_error}"
+                    )
+                    self.shared_state.set_critical_alert_sent()
+                    self.alerts.critical("SCAN RUNNER FAILURE ALERT", msg)
+                    self.stop_event.set()
+                    return
+
+        finally:
+            self.logger.info("Heartbeat thread stopped.")
