@@ -68,15 +68,16 @@ class ToSDebugController:
     # Logging / timing helpers
     # ------------------------------------------------------------------
 
-    def _log(self, msg: str, *args) -> None:
+    def _log(self, msg: str, *args, level: str = "info") -> None:
         if args:
             msg = msg % args
 
         if self.logger:
-            self.logger.info(msg)
+            log_method = getattr(self.logger, level, self.logger.info)
+            log_method(msg)
         else:
             now_str = time.strftime("%H:%M:%S")
-            print(f"{now_str} | {msg}")
+            print(f"{now_str} | {level.upper()} | {msg}")
 
     def _sleep(self, base_s: float) -> None:
         extra = random.uniform(0.0, self.EXTRA_DELAY_MAX_S) if self.ENABLE_RANDOM_TIMING else 0.0
@@ -338,11 +339,24 @@ class ToSDebugController:
             self._click()
 
     def cancel_export(self) -> None:
-        with self.action_lock:
-            self._log("ACTION | cancel_export")
-            self._bring_named_window_to_front("win_export")
-            self._move_vh("btn_save_cancel")
+        # with self.action_lock:
+        #     self._log("ACTION | cancel_export")
+        #     self._bring_named_window_to_front("win_export")
+        #     self._move_vh("btn_exp_cancel")
+        #     self._click()
+
+        self._log("ACTION | manual_init cancelling still-open save dialog")
+        self._bring_named_window_to_front("win_export")
+
+        try:
+            self._move_vh("btn_exp_cancel")
             self._click()
+        except KeyError:
+            self._log(
+                "ACTION | manual_init could not find btn_exp_cancel; pressing Escape to close save dialog",
+                level="warning",
+            )
+            pyautogui.press("esc")
 
     def verify_save(
         self,
@@ -444,7 +458,7 @@ class ToSDebugController:
                 if self._wait_for_window("win_export", timeout_s=0.1):
                     self._log("ACTION | manual_init cancelling still-open save dialog")
                     self._bring_named_window_to_front("win_export")
-                    self._move_vh("btn_save_cancel")
+                    self._move_vh("btn_exp_cancel")
                     self._click()
             else:
                 self._log("WARNING | manual_init did not detect win_export after export path")
