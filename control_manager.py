@@ -182,6 +182,12 @@ class ScanControlManager:
             self.logger.info("UI | Maintenance action finished: %s", label)
 
     def manual_init(self) -> None:
+        if self.is_running:
+            self.logger.warning(
+                "UI | Manual init ignored because scan loop is active. Stop the loop first."
+            )
+            return
+
         thread = threading.Thread(
             target=self._run_maintenance_action,
             args=("manual_init", lambda ctl: ctl.manual_init()),
@@ -190,7 +196,14 @@ class ScanControlManager:
         )
         thread.start()
 
+
     def unlock_scan(self) -> None:
+        if self.is_running:
+            self.logger.warning(
+                "UI | Unlock scan ignored because scan loop is active. Stop the loop first."
+            )
+            return
+
         def _do_unlock(ctl):
             unlocked = ctl.unlock_scan()
             self.logger.info("UI | Unlock scan result unlocked=%s", unlocked)
