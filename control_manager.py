@@ -104,43 +104,56 @@ class ScanControlManager:
         finally:
             self.user_scan_request.finish()
 
-    def request_user_scan(self) -> None:
-        self.logger.info("UI | Scan button clicked.")
-
+    def _classify_user_scan_request(self) -> tuple[str, Optional[float], bool]:
+        """Return the scan-button decision, seconds until next export, and pause state."""
         if self.maintenance_busy:
-            self.logger.warning("UI | Scan request ignored because a maintenance action is active.")
-            return
+            return "maintenance_busy", None, self.pause_ctl.is_paused()
 
-        # If runner is not active, just run immediately.
         if not self.is_running():
-            if not self.user_scan_request.start_immediate():
-                self.logger.warning("UI | Scan request ignored because one is already pending/active.")
-                return
-
-            thread = threading.Thread(
-                target=self._run_user_scan_now,
-                daemon=True,
-                name="UserScanImmediate",
-            )
-            thread.start()
-            return
+            return "run_stopped", None, self.pause_ctl.is_paused()
 
         seconds_until = self._seconds_until_next_export()
         paused = self.pause_ctl.is_paused()
 
-        if (
-            seconds_until is not None
-            and seconds_until >= USER_SCAN_MIN_LEAD_S
-            and not paused
-        ):
+        if paused:
+            return "paused", seconds_until, paused
+
+        if seconds_until is None:
+            return "unknown_next_export", seconds_until, paused
+
+        if seconds_until >= USER_SCAN_MIN_LEAD_S:
+            return "run_active_with_lead", seconds_until, paused
+
+        return "imminent_export", seconds_until, paused
+
+    def request_user_scan(self) -> None:
+        self.logger.info("UI | Scan button clicked.")
+
+        decision, seconds_until, paused = self._classify_user_scan_request()
+
+        if decision == "maintenance_busy":
+            self.logger.warning(
+                "UI | Scan request ignored because a maintenance action is active."
+            )
+            return
+
+        if decision in {"run_stopped", "run_active_with_lead"}:
             if not self.user_scan_request.start_immediate():
-                self.logger.warning("UI | Scan request ignored because one is already pending/active.")
+                self.logger.warning(
+                    "UI | Scan request ignored because one is already pending/active."
+                )
                 return
 
-            self.logger.info(
-                "UI | Scan request will run immediately. seconds_until_next_export=%.2f",
-                seconds_until,
-            )
+            if decision == "run_stopped":
+                self.logger.info(
+                    "UI | Scan request will run immediately because scan loop is not active."
+                )
+            else:
+                self.logger.info(
+                    "UI | Scan request will run immediately. "
+                    "seconds_until_next_export=%.2f",
+                    seconds_until,
+                )
 
             thread = threading.Thread(
                 target=self._run_user_scan_now,
@@ -150,17 +163,7 @@ class ScanControlManager:
             thread.start()
             return
 
-        if seconds_until is not None:
-            self.logger.info(
-                "UI | Scan request ignored because next scheduled export is imminent or scan loop is paused. "
-                "seconds_until_next_export=%.2f threshold=%.2f paused=%s",
-                seconds_until,
-                USER_SCAN_MIN_LEAD_S,
-                paused,
-            )
-            return
-
-        if paused:
+        if decision == "paused":
             self.logger.info(
                 "UI | Scan request ignored because scan loop is paused. "
                 "seconds_until_next_export=%s",
@@ -168,7 +171,13 @@ class ScanControlManager:
             )
             return
 
-        if seconds_until is not None:
+        if decision == "unknown_next_export":
+            self.logger.warning(
+                "UI | Scan request ignored because next scheduled export time is unknown."
+            )
+            return
+
+        if decision == "imminent_export":
             self.logger.info(
                 "UI | Scan request ignored because next scheduled export is imminent. "
                 "seconds_until_next_export=%.2f threshold=%.2f",
@@ -177,9 +186,8 @@ class ScanControlManager:
             )
             return
 
-        self.logger.warning(
-            "UI | Scan request ignored because next scheduled export time is unknown."
-        )
+        self.logger.warning("UI | Scan request ignored because decision=%s is unknown.", decision)
+
 
     def _run_maintenance_action(self, label: str, fn) -> None:
         with self.maintenance_lock:
@@ -257,10 +265,6 @@ class ScanControlManager:
             pushover_credentials = load_pushover_credentials(self.cfg)
 
             if pushover_credentials is None:
-                # raise StartupValidationError(
-                #     "Pushover notifications are enabled, but credentials are not configured yet. "
-                #     f"Expected encrypted credentials at: {self.cfg.pushover_ecfg_path}"
-                # )
                 self.logger.warning(
                     "Notifications requested, but Pushover credentials were not loaded; "
                     "notifications disabled for this run."
@@ -298,7 +302,6 @@ class ScanControlManager:
             output_dir=self.output_dir,
             flags=self.flags,
             pause_ctl=self.pause_ctl,
-            user_scan_request=self.user_scan_request,
         )
 
         self.heartbeat = HeartbeatThread(

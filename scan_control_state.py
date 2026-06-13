@@ -34,28 +34,13 @@ def wait_while_paused(
 class UserScanRequest:
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._pending = False
         self._active = False
 
     def start_immediate(self) -> bool:
         with self._lock:
-            if self._pending or self._active:
+            if self._active:
                 return False
-            self._active = True
-            return True
-
-    def request_deferred(self) -> bool:
-        with self._lock:
-            if self._pending or self._active:
-                return False
-            self._pending = True
-            return True
-
-    def consume_pending(self) -> bool:
-        with self._lock:
-            if not self._pending or self._active:
-                return False
-            self._pending = False
+            
             self._active = True
             return True
 
@@ -63,10 +48,9 @@ class UserScanRequest:
         with self._lock:
             self._active = False
 
-    def snapshot(self) -> tuple[bool, bool]:
+    def snapshot(self) -> tuple[bool]:
         with self._lock:
-            return self._pending, self._active
-
+            return (self._active,)
 
 class PauseController:
     def __init__(self) -> None:
