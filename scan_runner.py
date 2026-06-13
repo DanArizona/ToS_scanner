@@ -19,11 +19,10 @@ from exporter import ScanExporter
 from run_state import SharedState
 from scan_control_state import (
     PauseController,
-    UserScanRequest,
     wait_until_dynamic,
     wait_while_paused,
 )
-# from scheduler import SchedulerFlags, next_slot_after
+
 from scheduler import ET, SchedulerFlags, next_slot_after
 
 class ScanRunner:
@@ -37,7 +36,6 @@ class ScanRunner:
         output_dir: Path,
         flags: SchedulerFlags,
         pause_ctl: PauseController,
-        user_scan_request: UserScanRequest,
     ) -> None:
         self.exporter = exporter
         self.logger = logger
@@ -46,7 +44,6 @@ class ScanRunner:
         self.output_dir = output_dir
         self.flags = flags
         self.pause_ctl = pause_ctl
-        self.user_scan_request = user_scan_request
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -112,18 +109,6 @@ class ScanRunner:
                 self.exporter.export_scan(csv_path, slot_et, stop_event=self.stop_event)
 
                 self.shared_state.mark_completed(slot_et)
-
-                # If a user-requested scan was deferred because there was not
-                # enough time before this export, run it now.
-                if self.user_scan_request.consume_pending():
-                    self.logger.info("Runner servicing deferred user scan after export.")
-                    try:
-                        self.shared_state.touch(phase="manual_scan")
-                        self.exporter.perform_user_scan(stop_event=self.stop_event)
-                    except Exception as exc:
-                        self.logger.exception("Deferred user scan failed: %s", exc)
-                    finally:
-                        self.user_scan_request.finish()
 
                 self.shared_state.touch(phase="idle")
 
