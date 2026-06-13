@@ -42,3 +42,4 @@ test_widget_tree_v2_output.txt
 tmp/*
 secure/
 *.ecfg
+*.odp*

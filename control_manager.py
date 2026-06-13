@@ -150,14 +150,36 @@ class ScanControlManager:
             thread.start()
             return
 
-        if self.user_scan_request.request_deferred():
+        if seconds_until is not None:
             self.logger.info(
-                "UI | Scan request deferred until after the upcoming export. seconds_until_next_export=%s paused=%s",
-                "None" if seconds_until is None else f"{seconds_until:.2f}",
+                "UI | Scan request ignored because next scheduled export is imminent or scan loop is paused. "
+                "seconds_until_next_export=%.2f threshold=%.2f paused=%s",
+                seconds_until,
+                USER_SCAN_MIN_LEAD_S,
                 paused,
             )
-        else:
-            self.logger.warning("UI | Scan request ignored because one is already pending/active.")
+            return
+
+        if paused:
+            self.logger.info(
+                "UI | Scan request ignored because scan loop is paused. "
+                "seconds_until_next_export=%s",
+                "None" if seconds_until is None else f"{seconds_until:.2f}",
+            )
+            return
+
+        if seconds_until is not None:
+            self.logger.info(
+                "UI | Scan request ignored because next scheduled export is imminent. "
+                "seconds_until_next_export=%.2f threshold=%.2f",
+                seconds_until,
+                USER_SCAN_MIN_LEAD_S,
+            )
+            return
+
+        self.logger.warning(
+            "UI | Scan request ignored because next scheduled export time is unknown."
+        )
 
     def _run_maintenance_action(self, label: str, fn) -> None:
         with self.maintenance_lock:
@@ -181,41 +203,6 @@ class ScanControlManager:
             self.maintenance_busy = False
             self.logger.info("UI | Maintenance action finished: %s", label)
 
-    # def manual_init(self) -> None:
-    #     if self.is_running:
-    #         self.logger.warning(
-    #             "UI | Manual init ignored because scan loop is active. Stop the loop first."
-    #         )
-    #         return
-
-    #     thread = threading.Thread(
-    #         target=self._run_maintenance_action,
-    #         args=("manual_init", lambda ctl: ctl.manual_init()),
-    #         daemon=True,
-    #         name="ManualInit",
-    #     )
-    #     thread.start()
-
-
-    # def unlock_scan(self) -> None:
-    #     if self.is_running:
-    #         self.logger.warning(
-    #             "UI | Unlock scan ignored because scan loop is active. Stop the loop first."
-    #         )
-    #         return
-
-    #     def _do_unlock(ctl):
-    #         unlocked = ctl.unlock_scan()
-    #         self.logger.info("UI | Unlock scan result unlocked=%s", unlocked)
-
-    #     thread = threading.Thread(
-    #         target=self._run_maintenance_action,
-    #         args=("unlock_scan", _do_unlock),
-    #         daemon=True,
-    #         name="UnlockScan",
-    #     )
-    #     thread.start()
-
     def manual_init(self) -> None:
         if self.is_running():
             self.logger.warning(
@@ -230,7 +217,6 @@ class ScanControlManager:
             name="ManualInit",
         )
         thread.start()
-
 
     def unlock_scan(self) -> None:
         if self.is_running():
