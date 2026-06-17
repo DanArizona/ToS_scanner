@@ -1,4 +1,4 @@
-# tos_debug_actions.py
+# tos_pwidget_actions.py
 
 from __future__ import annotations
 
@@ -230,62 +230,62 @@ class ToSDebugController:
         with self.action_lock:
             self._log("ACTION | open_scan_tab")
             self._bring_named_window_to_front("win_main")
-            self._move_center("tab_scan")
+            self._move_center("tab_main_scan")
             self._click()
 
     def load_scan50_query(self) -> None:
         with self.action_lock:
             self._log("ACTION | load_scan50_query")
             self._bring_named_window_to_front("win_main")
-            self._move_center("tab_scan")
+            self._move_center("tab_main_scan")
             self._click()
 
             self._move_center("btn_query_menu")
             self._click()
-            self._move_vh("pick_load_query")
+            self._move_vh("pick_query_load")
             self._click()
-            self._move_hv("pick_personal_query")
+            self._move_hv("pick_query_personal")
             self._click()
-            self._move_hv("pick_scan50_data")
+            self._move_hv("pick_query_scan50")
             self._click()
 
     def load_pct_gainers_query(self) -> None:
         with self.action_lock:
             self._log("ACTION | load_pct_gainers_query")
             self._bring_named_window_to_front("win_main")
-            self._move_center("tab_scan")
+            self._move_center("tab_main_scan")
             self._click()
 
             self._move_center("btn_query_menu")
             self._click()
-            self._move_vh("pick_load_query")
+            self._move_vh("pick_query_load")
             self._click()
-            self._move_hv("pick_public_query")
+            self._move_hv("pick_query_public")
             self._click()
-            self._move_hv("pick_pct_gainers")
+            self._move_hv("pick_query_pct_gainers")
             self._click()
 
     def trigger_scan(self) -> None:
         with self.action_lock:
             self._log("ACTION | trigger_scan")
             self._bring_named_window_to_front("win_main")
-            self._move_center("tab_scan")
+            self._move_center("tab_main_scan")
             self._click()
-            self._move_center("btn_scan")
+            self._move_center("btn_hacker_scan")
             self._click()
 
     def export_csv_file(self) -> None:
         with self.action_lock:
             self._log("ACTION | export_csv_file")
             self._bring_named_window_to_front("win_main")
-            self._move_center("tab_scan")
+            self._move_center("tab_main_scan")
             self._click()
 
-            self._move_center("btn_action_menu")
+            self._move_center("btn_scan_actions")
             self._click()
-            self._move_vh("pick_export")
+            self._move_vh("pick_scan_export")
             self._click()
-            self._move_hv("pick_to_file")
+            self._move_hv("pick_scan_to_file")
             self._click()
 
             if not self._wait_for_window("win_export", timeout_s=2.0):
@@ -310,26 +310,11 @@ class ToSDebugController:
             self._log("ACTION | full save path -> %s", full_path)
 
             self._bring_named_window_to_front("win_export")
-            self._move_center("ledit_fname")
+            self._move_center("ledit_exp_fname")
             self._click()
             self._select_all()
             self._delete_selection()
             self._type_text(full_path)
-
-
-    # def enter_filename(self, filename: str) -> None:
-    #     """
-    #     Enter the filename only.
-    #     Use confirm_save() to click Save.
-    #     """
-    #     with self.action_lock:
-    #         self._log("ACTION | enter_filename -> %s", filename)
-    #         self._bring_named_window_to_front("win_export")
-    #         self._move_center("ledit_fname")
-    #         self._click()
-    #         self._select_all()
-    #         self._delete_selection()
-    #         self._type_text(filename)
 
     def confirm_save(self) -> None:
         with self.action_lock:
@@ -339,12 +324,6 @@ class ToSDebugController:
             self._click()
 
     def cancel_export(self) -> None:
-        # with self.action_lock:
-        #     self._log("ACTION | cancel_export")
-        #     self._bring_named_window_to_front("win_export")
-        #     self._move_vh("btn_exp_cancel")
-        #     self._click()
-
         self._log("ACTION | manual_init cancelling still-open save dialog")
         self._bring_named_window_to_front("win_export")
 
@@ -401,7 +380,7 @@ class ToSDebugController:
     def scan_region_is_active(
         self,
         *,
-        widget_name: str = "ocr_MyR_5",
+        widget_name: str = "ocr_hacker_MyR5",
         delta_gray: int = 18,
         min_light_pct: float = 1.2,
         min_stddev: float = 6.0,
@@ -438,17 +417,17 @@ class ToSDebugController:
             self._log("ACTION | manual_init begin")
 
             self._bring_named_window_to_front("win_main")
-            self._move_center("tab_scan")
+            self._move_center("tab_main_scan")
             self._click()
 
             self._move_center("btn_stock_hacker")
             self._click()
 
-            self._move_center("btn_action_menu")
+            self._move_center("btn_scan_actions")
             self._click()
-            self._move_vh("pick_export")
+            self._move_vh("pick_scan_export")
             self._click()
-            self._move_hv("pick_to_file")
+            self._move_hv("pick_scan_to_file")
             self._click()
 
             if self._wait_for_window("win_export", timeout_s=2.0):
@@ -475,7 +454,7 @@ class ToSDebugController:
             self._log("ACTION | unlock_scan begin")
 
             self._bring_named_window_to_front("win_main")
-            self._move_center("tab_scan")
+            self._move_center("tab_main_scan")
             self._click()
 
             self._move_center("btn_stock_hacker")
@@ -508,22 +487,22 @@ class ToSDebugController:
         """
         User-initiated scan sequence:
         - bring main window to front
-        - click tab_scan
+        - click tab_main_scan
         - wait 1 second
-        - click btn_scan
+        - click btn_hacker_scan
         """
         with self.action_lock:
             self._log("ACTION | user_scan begin")
 
             self._bring_named_window_to_front("win_main")
-            self._move_center("tab_scan")
+            self._move_center("tab_main_scan")
             self._click()
 
-            self._log("ACTION | user_scan waiting %.1f seconds before btn_scan", pre_wait_s)
+            self._log("ACTION | user_scan waiting %.1f seconds before btn_hacker_scan", pre_wait_s)
             time.sleep(pre_wait_s)
 
-            self._move_center("btn_scan")
-            self._log("ACTION | btn_scan pressed for user scan")
+            self._move_center("btn_hacker_scan")
+            self._log("ACTION | btn_hacker_scan pressed for user scan")
             self._click()
 
             self._log("ACTION | user_scan end")

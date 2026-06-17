@@ -1,4 +1,4 @@
-# test_tos_debug_actions.py
+# test_tos_pwidget_actions.py
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ from pathlib import Path
 from pynput import keyboard
 
 from config import load_scanner_config
-from tos_debug_actions import ToSDebugController, install_debug_hotkeys
+from tos_pwidget_actions import ToSDebugController, install_debug_hotkeys
 
 
 def setup_logger(log_dir: Path) -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"tos-debug-actions-{datetime.now():%Y-%m-%d}.log"
 
-    logger = logging.getLogger("tos_debug_actions")
+    logger = logging.getLogger("tos_pwidget_actions")
     logger.setLevel(logging.INFO)
     logger.propagate = False
 
