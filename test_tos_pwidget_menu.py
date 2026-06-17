@@ -1,4 +1,4 @@
-# test_tos_debug_menu.py
+# test_tos_pwidget_menu.py
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from config import load_scanner_config
-from tos_debug_actions import ToSDebugController
+from tos_pwidget_actions import ToSDebugController
 
 
 def setup_logger(log_dir: Path) -> logging.Logger:

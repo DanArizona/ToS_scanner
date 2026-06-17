@@ -79,7 +79,7 @@ class ScannerConfig:
             "win_updater": self.window_tos_update,
             "win_export": self.window_tos_export,
             "win_wl_main": self.window_tos_wl_main,
-            "win_wl_symbols": self.window_tos_wl_symbols,
+            "win_wl_symbols_import": self.window_tos_wl_symbols,
             "win_wl_export": self.window_tos_wl_export_match,
         }
 

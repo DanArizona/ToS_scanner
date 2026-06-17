@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 
 from config import ScannerConfig
 from layout import load_widget_layout
-from tos_debug_actions import ToSDebugController
+from tos_pwidget_actions import ToSDebugController
 
 
 ET = ZoneInfo("America/New_York")
