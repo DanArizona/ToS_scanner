@@ -11,9 +11,11 @@ from typing import Optional
 from PySide6.QtCore import QObject, Signal, Slot, Qt
 from PySide6.QtWidgets import (
     QApplication,
+    QFileDialog,
     QLabel,
     QGridLayout,
     QHBoxLayout,
+    QLineEdit,
     QPushButton,
     QTextEdit,
     QVBoxLayout,
@@ -89,12 +91,14 @@ class DebugPanel(QWidget):
         self,
         *,
         controller: ToSDebugController,
+        layout_path: Path,
         target_dir: Path,
         logger: logging.Logger,
     ) -> None:
         super().__init__()
 
         self.controller = controller
+        self.layout_path = Path(layout_path)        
         self.target_dir = target_dir
         self.logger = logger
         self.current_filename: Optional[str] = None
@@ -108,13 +112,14 @@ class DebugPanel(QWidget):
         self.qt_log_handler = QtLogHandler(self.bridge)
         self.logger.addHandler(self.qt_log_handler)
 
-        self.setWindowTitle("ToS Debug Panel")
+        self.setWindowTitle("ToS Actions Panel")
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.resize(760, 520)
 
         self._build_ui()
 
         self.logger.info("Debug panel started.")
+        self.logger.info("Layout YAML: %s", self.layout_path)        
         self.logger.info("Target directory: %s", self.target_dir)
 
     def closeEvent(self, event) -> None:
@@ -129,7 +134,7 @@ class DebugPanel(QWidget):
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
 
-        title = QLabel("ToS Debug Panel")
+        title = QLabel("ToS Actions Panel")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("font-size: 16px; font-weight: bold;")
         outer.addWidget(title)
@@ -138,13 +143,30 @@ class DebugPanel(QWidget):
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         outer.addWidget(self.status_label)
 
-        self.filename_label = QLabel("Current filename:")
+        self.filename_label = QLabel("Current CSV filename:")
         outer.addWidget(self.filename_label)
 
         self.filename_value = QLabel("<none>")
         self.filename_value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.filename_value.setStyleSheet("font-family: Consolas, monospace;")
         outer.addWidget(self.filename_value)
+
+        layout_row = QHBoxLayout()
+        outer.addLayout(layout_row)
+
+        layout_row.addWidget(QLabel("Layout YAML:"))
+
+        self.layout_path_edit = QLineEdit(str(self.layout_path))
+        self.layout_path_edit.setMinimumWidth(520)
+        layout_row.addWidget(self.layout_path_edit, stretch=1)
+
+        self.layout_browse_btn = QPushButton("Browse")
+        self.layout_browse_btn.clicked.connect(self.browse_layout_yaml)
+        layout_row.addWidget(self.layout_browse_btn)
+
+        self.layout_reload_btn = QPushButton("Reload")
+        self.layout_reload_btn.clicked.connect(self.reload_layout_yaml)
+        layout_row.addWidget(self.layout_reload_btn)
 
         self.target_dir_label = QLabel(f"Target dir: {self.target_dir}")
         self.target_dir_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -166,6 +188,9 @@ class DebugPanel(QWidget):
             (8, "8  Cancel Export"),
             (9, "9  Verify Save"),
             (10, "10  NOP"),
+            (11, "11  Select WL Default"),
+            (12, "12  Select WL scan50_data"),
+            (13, "13  Open WL Export"),
         ]
 
         for idx, (action_id, text) in enumerate(action_specs):
@@ -205,6 +230,53 @@ class DebugPanel(QWidget):
 
     def set_filename_text(self, filename: str) -> None:
         self.filename_value.setText(filename)
+
+
+
+    def browse_layout_yaml(self) -> None:
+        start_path = str(Path(self.layout_path_edit.text()).parent)
+
+        selected, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select pseudo-widget layout YAML",
+            start_path,
+            "YAML files (*.yaml *.yml);;All files (*.*)",
+        )
+
+        if selected:
+            self.layout_path_edit.setText(selected)
+            self.logger.info("PANEL | selected layout YAML: %s", selected)
+
+
+    def reload_layout_yaml(self) -> None:
+        if self.busy:
+            self.logger.info("PANEL | reload layout ignored because panel is busy")
+            return
+
+        new_path = Path(self.layout_path_edit.text()).expanduser().resolve()
+
+        if not new_path.is_file():
+            self.logger.warning("PANEL | layout YAML does not exist: %s", new_path)
+            self.status_label.setText("Layout YAML not found")
+            return
+
+        try:
+            self.set_busy(True, "Reloading layout YAML ...")
+            self.controller = ToSDebugController(
+                layout_path=new_path,
+                cfg=self.controller.cfg,
+                logger=self.logger,
+            )
+            self.layout_path = new_path
+            self.layout_path_edit.setText(str(new_path))
+            self.logger.info("PANEL | reloaded layout YAML: %s", new_path)
+            self.status_label.setText("Layout reloaded")
+        except Exception:
+            self.logger.exception("PANEL | failed to reload layout YAML: %s", new_path)
+            self.status_label.setText("Layout reload failed")
+        finally:
+            self.set_busy(False, "Ready")
+
 
     def start_action(self, action_id: int) -> None:
         if self.busy:
@@ -270,6 +342,15 @@ class DebugPanel(QWidget):
 
             elif action_id == 10:
                 self.controller.nop()
+
+            elif action_id == 11:
+                self.controller.select_watchlist_default()
+
+            elif action_id == 12:
+                self.controller.select_watchlist_scan50_data()
+
+            elif action_id == 13:
+                self.controller.open_watchlist_export()
 
             else:
                 self.logger.warning("ACTION | unknown action id: %s", action_id)
@@ -354,6 +435,7 @@ def main() -> int:
 
     panel = DebugPanel(
         controller=controller,
+        layout_path=Path(cfg.pwidget_yaml_path),
         target_dir=target_dir,
         logger=logger,
     )
