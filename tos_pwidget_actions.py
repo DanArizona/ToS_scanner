@@ -24,7 +24,7 @@ pyautogui.PAUSE = 0.0
 
 class ToSDebugController:
     """
-    Debug controller for ToS pseudo-widget interaction.
+    Controller for scripted ToS pseudo-widget interaction.
 
     Notes
     -----
@@ -320,7 +320,7 @@ class ToSDebugController:
         with self.action_lock:
             self._log("ACTION | confirm_save")
             self._bring_named_window_to_front("win_export")
-            self._move_vh("btn_save_file")
+            self._move_vh("btn_exp_save")
             self._click()
 
     def cancel_export(self) -> None:
@@ -373,6 +373,53 @@ class ToSDebugController:
 
             self._log("VERIFY | save not confirmed within timeout: %s", path)
             return False
+
+    # ------------------------------------------------------------------
+    # Watchlist actions
+    # ------------------------------------------------------------------
+
+    def select_watchlist_default(self) -> None:
+        with self.action_lock:
+            self._log("ACTION | select_watchlist_default")
+            self._bring_named_window_to_front("win_wl_main")
+
+            self._move_center("btn_wl_actions")
+            self._click()
+            self._move_vh("pick_wl_personal")
+            self._click()
+            self._move_hv("pick_wl_default")
+            self._click()
+
+    def select_watchlist_scan50_data(self) -> None:
+        with self.action_lock:
+            self._log("ACTION | select_watchlist_scan50_data")
+            self._bring_named_window_to_front("win_wl_main")
+
+            self._move_center("btn_wl_actions")
+            self._click()
+            self._move_vh("pick_wl_personal")
+            self._click()
+            self._move_hv("pick_wl_scan50_data")
+            self._click()
+
+    def open_watchlist_export(self) -> None:
+        with self.action_lock:
+            self._log("ACTION | open_watchlist_export")
+            self._bring_named_window_to_front("win_wl_main")
+
+            self._move_center("btn_wl_export_menu")
+            self._click()
+            self._move_vh("pick_wl_export")
+            self._click()
+
+            if not self._wait_for_window("win_wl_export", timeout_s=2.0):
+                raise RuntimeError("win_wl_export did not appear after watchlist export path.")
+
+            self._log("GUI | win_wl_export detected")
+
+    # ------------------------------------------------------------------
+    # Misc / diagnostics
+    # ------------------------------------------------------------------
 
     def nop(self) -> None:
         self._log("ACTION | nop")
@@ -510,7 +557,7 @@ class ToSDebugController:
 
 def install_debug_hotkeys(controller: ToSDebugController, make_filename, target_dir):
     """
-    Install manual debug hotkeys for ToSDebugController.
+    Install manual diagnostic hotkeys for ToSDebugController.
 
     Returns the hotkey mapping so the caller can inspect/log it if desired.
 
