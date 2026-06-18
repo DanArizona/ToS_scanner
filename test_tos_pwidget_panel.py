@@ -168,9 +168,22 @@ class DebugPanel(QWidget):
         self.layout_reload_btn.clicked.connect(self.reload_layout_yaml)
         layout_row.addWidget(self.layout_reload_btn)
 
-        self.target_dir_label = QLabel(f"Target dir: {self.target_dir}")
-        self.target_dir_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        outer.addWidget(self.target_dir_label)
+        # self.target_dir_label = QLabel(f"Target dir: {self.target_dir}")
+        # self.target_dir_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        # outer.addWidget(self.target_dir_label)
+
+        target_row = QHBoxLayout()
+        outer.addLayout(target_row)
+
+        target_row.addWidget(QLabel("Target dir:"))
+
+        self.target_dir_edit = QLineEdit(str(self.target_dir))
+        self.target_dir_edit.setMinimumWidth(520)
+        target_row.addWidget(self.target_dir_edit, stretch=1)
+
+        self.target_browse_btn = QPushButton("Browse")
+        self.target_browse_btn.clicked.connect(self.browse_target_dir)
+        target_row.addWidget(self.target_browse_btn)
 
         grid = QGridLayout()
         outer.addLayout(grid)
@@ -278,6 +291,39 @@ class DebugPanel(QWidget):
             self.set_busy(False, "Ready")
 
 
+    def browse_target_dir(self) -> None:
+        start_path = self.target_dir_edit.text().strip()
+
+        if not start_path:
+            start_path = str(self.target_dir)
+
+        selected = QFileDialog.getExistingDirectory(
+            self,
+            "Select target directory for scan CSV files",
+            start_path,
+        )
+
+        if selected:
+            self.target_dir_edit.setText(selected)
+            self.target_dir = Path(selected).expanduser().resolve()
+            self.logger.info("PANEL | selected target directory: %s", self.target_dir)
+
+
+    def current_target_dir(self) -> Path:
+        raw_text = self.target_dir_edit.text().strip()
+
+        if not raw_text:
+            raise RuntimeError("Target directory is blank.")
+
+        target_dir = Path(raw_text).expanduser().resolve()
+
+        if not target_dir.is_dir():
+            raise RuntimeError(f"Target directory does not exist: {target_dir}")
+
+        self.target_dir = target_dir
+        return target_dir
+
+
     def start_action(self, action_id: int) -> None:
         if self.busy:
             self.logger.info("PANEL | action %s ignored because panel is busy", action_id)
@@ -314,10 +360,14 @@ class DebugPanel(QWidget):
                 self.controller.export_csv_file()
 
             elif action_id == 6:
+                # self.current_filename = make_filename()
+                # self.logger.info("ACTION | current filename set to %s", self.current_filename)
+                # self.bridge.filename_changed.emit(self.current_filename)
+                # self.controller.enter_filename(self.current_filename, self.target_dir)
                 self.current_filename = make_filename()
                 self.logger.info("ACTION | current filename set to %s", self.current_filename)
                 self.bridge.filename_changed.emit(self.current_filename)
-                self.controller.enter_filename(self.current_filename, self.target_dir)
+                self.controller.enter_filename(self.current_filename, self.current_target_dir())
 
             elif action_id == 7:
                 self.controller.confirm_save()
@@ -326,14 +376,24 @@ class DebugPanel(QWidget):
                 self.controller.cancel_export()
 
             elif action_id == 9:
-                if not self.current_filename:
-                    self.logger.warning("VERIFY | no current filename is set yet")
-                    return
+                filename = self.current_filename
+                # if not self.current_filename:
+                if not filename:
+                    # self.logger.warning("VERIFY | no current filename is set yet")
+                    # return
+                    raise RuntimeError("No current CSV filename to verify.")
 
-                ok = self.controller.verify_save(
-                    self.target_dir,
-                    self.current_filename,
-                )
+                # ok = self.controller.verify_save(
+                #     self.target_dir,
+                #     self.current_filename,
+                # )
+                ok = self.controller.verify_save(self.current_target_dir(), filename)
+
+                if ok:
+                    self.status_label.setText("Save verified")
+                else:
+                    self.status_label.setText("Save not verified")
+
                 self.logger.info(
                     "VERIFY | filename=%s result=%s",
                     self.current_filename,
