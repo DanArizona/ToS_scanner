@@ -293,28 +293,136 @@ class ToSDebugController:
 
             self._log("GUI | win_export detected")
 
-
-    def enter_filename(self, filename: str, target_dir: str | Path) -> None:
+    def enter_filename_then_export_directory(
+        self,
+        filename: str,
+        target_dir: str | Path,
+    ) -> None:
         """
-        Enter the full save path into the filename field.
+        First-time setup workflow for the scan export dialog.
 
-        Example typed text:
-            C:\\Users\\DanLa\\Documents\\github\\ToS_scans\\scan-2026-03-13-09-30-05-ToS.csv
-
-        Use confirm_save() to click Save.
+        Enter the filename while the save dialog is still in its usual geometry,
+        then enter the target directory. Changing the directory may shift the
+        filename field, but the filename has already been entered.
         """
         with self.action_lock:
-            full_path = str(Path(target_dir) / filename)
+            target_dir = Path(target_dir).expanduser().resolve()
+            expected_path = target_dir / filename
 
-            self._log("ACTION | enter_filename -> %s", filename)
-            self._log("ACTION | full save path -> %s", full_path)
+            self._log("ACTION | enter_filename_then_export_directory")
+            self._log("ACTION | filename -> %s", filename)
+            self._log("ACTION | target directory -> %s", target_dir)
+            self._log("ACTION | expected save path -> %s", expected_path)
 
             self._bring_named_window_to_front("win_export")
+
             self._move_center("ledit_exp_fname")
             self._click()
             self._select_all()
             self._delete_selection()
-            self._type_text(full_path)
+            self._type_text(filename)
+
+            self._move_center("ledit_exp_dir")
+            self._click()
+            self._select_all()
+            self._delete_selection()
+            self._type_text(str(target_dir))
+            pyautogui.press("enter")
+            self._sleep(1.0)
+
+
+    # def enter_export_directory(self, target_dir: str | Path) -> None:
+    #     """
+    #     Enter the target directory into the scan export dialog.
+
+    #     This sets the save dialog's current directory. The filename should still
+    #     be entered separately into ledit_exp_fname.
+    #     """
+    #     with self.action_lock:
+    #         target_dir = Path(target_dir).expanduser().resolve()
+
+    #         self._log("ACTION | enter_export_directory -> %s", target_dir)
+
+    #         self._bring_named_window_to_front("win_export")
+    #         self._move_center("ledit_exp_dir")
+    #         self._click()
+    #         self._select_all()
+    #         self._delete_selection()
+    #         self._type_text(str(target_dir))
+    #         pyautogui.press("enter")
+    #         self._sleep(self.STEP_PAUSE_S)
+
+    def enter_export_directory(self, target_dir: str | Path) -> None:
+        """
+        Enter the target directory into the scan export dialog.
+
+        This sets the save dialog's current directory. The filename should still
+        be entered separately into ledit_exp_fname.
+        """
+        with self.action_lock:
+            target_dir = Path(target_dir).expanduser().resolve()
+
+            self._log("ACTION | enter_export_directory -> %s", target_dir)
+
+            self._bring_named_window_to_front("win_export")
+            self._move_center("ledit_exp_dir")
+            self._click()
+            self._select_all()
+            self._delete_selection()
+            self._type_text(str(target_dir))
+            pyautogui.press("enter")
+            self._sleep(1.0)
+
+    # def enter_filename(self, filename: str, target_dir: str | Path) -> None:
+    #     """
+    #     Enter only the CSV filename into the scan export filename field.
+
+    #     The target directory is expected to already be selected in the ToS save
+    #     dialog. The full path is logged for verification/debugging only.
+
+    #     Example typed text:
+    #         scan-2026-03-13-09-30-05-ToS.csv
+
+    #     Use confirm_save() to click Save.
+    #     """
+    #     with self.action_lock:
+    #         expected_path = Path(target_dir).expanduser().resolve() / filename
+
+    #         self._log("ACTION | enter_filename -> %s", filename)
+    #         self._log("ACTION | full save path -> %s", expected_path)
+
+    #         self._bring_named_window_to_front("win_export")
+    #         self._move_center("ledit_exp_fname")
+    #         self._click()
+    #         self._select_all()
+    #         self._delete_selection()
+    #         self._type_text(filename)
+
+    def enter_filename(self, filename: str, target_dir: str | Path) -> None:
+        """
+        Enter only the CSV filename into the scan export filename field.
+
+        The target directory is expected to already be selected in the ToS save
+        dialog. The full path is logged for verification/debugging only.
+
+        Example typed text:
+            scan-2026-03-13-09-30-05-ToS.csv
+
+        Use confirm_save() to click Save.
+        """
+        with self.action_lock:
+            expected_path = Path(target_dir).expanduser().resolve() / filename
+
+            self._log("ACTION | enter_filename -> %s", filename)
+            self._log("ACTION | expected save path -> %s", expected_path)
+
+            self._bring_named_window_to_front("win_export")
+            self._move_center("ledit_exp_fname")
+            self._click()
+            self._sleep(0.5)
+            self._select_all()
+            self._delete_selection()
+            self._type_text(filename)
 
     def confirm_save(self) -> None:
         with self.action_lock:
