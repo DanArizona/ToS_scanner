@@ -204,6 +204,7 @@ class DebugPanel(QWidget):
             (11, "11  Select WL Default"),
             (12, "12  Select WL scan50_data"),
             (13, "13  Open WL Export"),
+            (14, "14 Setup Export Dir"),
         ]
 
         for idx, (action_id, text) in enumerate(action_specs):
@@ -363,11 +364,16 @@ class DebugPanel(QWidget):
                 # self.current_filename = make_filename()
                 # self.logger.info("ACTION | current filename set to %s", self.current_filename)
                 # self.bridge.filename_changed.emit(self.current_filename)
-                # self.controller.enter_filename(self.current_filename, self.target_dir)
+                # self.controller.enter_filename(self.current_filename, self.current_target_dir())
+
+                target_dir = self.current_target_dir()
+
                 self.current_filename = make_filename()
                 self.logger.info("ACTION | current filename set to %s", self.current_filename)
                 self.bridge.filename_changed.emit(self.current_filename)
-                self.controller.enter_filename(self.current_filename, self.current_target_dir())
+
+                self.controller.enter_export_directory(target_dir)
+                self.controller.enter_filename(self.current_filename, target_dir)
 
             elif action_id == 7:
                 self.controller.confirm_save()
@@ -411,6 +417,18 @@ class DebugPanel(QWidget):
 
             elif action_id == 13:
                 self.controller.open_watchlist_export()
+
+            elif action_id == 14:
+                target_dir = self.current_target_dir()
+
+                self.current_filename = make_filename()
+                self.logger.info("ACTION | current filename set to %s", self.current_filename)
+                self.bridge.filename_changed.emit(self.current_filename)
+
+                self.controller.enter_filename_then_export_directory(
+                    self.current_filename,
+                    target_dir,
+                )
 
             else:
                 self.logger.warning("ACTION | unknown action id: %s", action_id)
