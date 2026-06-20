@@ -361,18 +361,12 @@ class DebugPanel(QWidget):
                 self.controller.export_csv_file()
 
             elif action_id == 6:
-                # self.current_filename = make_filename()
-                # self.logger.info("ACTION | current filename set to %s", self.current_filename)
-                # self.bridge.filename_changed.emit(self.current_filename)
-                # self.controller.enter_filename(self.current_filename, self.current_target_dir())
-
                 target_dir = self.current_target_dir()
 
                 self.current_filename = make_filename()
                 self.logger.info("ACTION | current filename set to %s", self.current_filename)
                 self.bridge.filename_changed.emit(self.current_filename)
 
-                self.controller.enter_export_directory(target_dir)
                 self.controller.enter_filename(self.current_filename, target_dir)
 
             elif action_id == 7:
