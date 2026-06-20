@@ -58,8 +58,19 @@ def setup_logger(log_dir: Path) -> logging.Logger:
 
 
 def make_filename() -> str:
-    return f"scan-{datetime.now():%Y-%m-%d-%H-%M-%S}-ToS.csv"
+#     return f"scan-{datetime.now():%Y-%m-%d-%H-%M-%S}-ToS.csv"
+    return make_scan_filename()
 
+def make_tos_filename(prefix: str) -> str:
+    return datetime.now().strftime(f"{prefix}-%Y-%m-%d-%H-%M-%S-ToS.csv")
+
+
+def make_scan_filename() -> str:
+    return make_tos_filename("scan")
+
+
+def make_watchlist_filename() -> str:
+    return make_tos_filename("wlist")
 
 class PanelBridge(QObject):
     action_finished = Signal()
@@ -363,7 +374,8 @@ class DebugPanel(QWidget):
             elif action_id == 6:
                 target_dir = self.current_target_dir()
 
-                self.current_filename = make_filename()
+                self.current_filename = make_scan_filename()
+
                 self.logger.info("ACTION | current filename set to %s", self.current_filename)
                 self.bridge.filename_changed.emit(self.current_filename)
 
@@ -415,7 +427,7 @@ class DebugPanel(QWidget):
             elif action_id == 14:
                 target_dir = self.current_target_dir()
 
-                self.current_filename = make_filename()
+                self.current_filename = make_scan_filename()
                 self.logger.info("ACTION | current filename set to %s", self.current_filename)
                 self.bridge.filename_changed.emit(self.current_filename)
 
@@ -456,7 +468,7 @@ class DebugPanel(QWidget):
 
             self.controller.export_csv_file()
 
-            self.current_filename = make_filename()
+            self.current_filename = make_scan_filename()
             self.logger.info("SEQUENCE | current filename set to %s", self.current_filename)
             self.bridge.filename_changed.emit(self.current_filename)
 
