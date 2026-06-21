@@ -389,16 +389,9 @@ class DebugPanel(QWidget):
 
             elif action_id == 9:
                 filename = self.current_filename
-                # if not self.current_filename:
                 if not filename:
-                    # self.logger.warning("VERIFY | no current filename is set yet")
-                    # return
                     raise RuntimeError("No current CSV filename to verify.")
 
-                # ok = self.controller.verify_save(
-                #     self.target_dir,
-                #     self.current_filename,
-                # )
                 ok = self.controller.verify_save(self.current_target_dir(), filename)
 
                 if ok:
@@ -464,16 +457,20 @@ class DebugPanel(QWidget):
                 self.controller.cancel_watchlist_export()
 
             elif action_id == 19:
-                if not self.current_filename:
-                    raise RuntimeError("No current filename set. Run action 15 or 16 first.")
+                filename = self.current_filename
+                if not filename:
+                    raise RuntimeError("No current watchlist filename to verify.")
 
-                ok = self.controller.verify_save(
-                    self.current_filename,
-                    self.current_target_dir(),
-                )
+                ok = self.controller.verify_save(self.current_target_dir(), filename)
+
+                if ok:
+                    self.status_label.setText("Watchlist save verified")
+                else:
+                    self.status_label.setText("Watchlist save not verified")
+
                 self.logger.info(
                     "VERIFY | watchlist filename=%s result=%s",
-                    self.current_filename,
+                    filename,
                     ok,
                 )
 
