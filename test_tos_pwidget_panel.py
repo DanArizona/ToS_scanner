@@ -216,6 +216,11 @@ class DebugPanel(QWidget):
             (12, "12  Select WL scan50_data"),
             (13, "13  Open WL Export"),
             (14, "14 Setup Export Dir"),
+            (15, "15 Enter WL Filename"),
+            (16, "16 Setup WL Export Dir"),
+            (17, "17 Confirm WL Save"),
+            (18, "18 Cancel WL Export"),
+            (19, "19 Verify WL Save"),
         ]
 
         for idx, (action_id, text) in enumerate(action_specs):
@@ -255,8 +260,6 @@ class DebugPanel(QWidget):
 
     def set_filename_text(self, filename: str) -> None:
         self.filename_value.setText(filename)
-
-
 
     def browse_layout_yaml(self) -> None:
         start_path = str(Path(self.layout_path_edit.text()).parent)
@@ -302,7 +305,6 @@ class DebugPanel(QWidget):
         finally:
             self.set_busy(False, "Ready")
 
-
     def browse_target_dir(self) -> None:
         start_path = self.target_dir_edit.text().strip()
 
@@ -320,7 +322,6 @@ class DebugPanel(QWidget):
             self.target_dir = Path(selected).expanduser().resolve()
             self.logger.info("PANEL | selected target directory: %s", self.target_dir)
 
-
     def current_target_dir(self) -> Path:
         raw_text = self.target_dir_edit.text().strip()
 
@@ -334,7 +335,6 @@ class DebugPanel(QWidget):
 
         self.target_dir = target_dir
         return target_dir
-
 
     def start_action(self, action_id: int) -> None:
         if self.busy:
@@ -436,6 +436,47 @@ class DebugPanel(QWidget):
                     target_dir,
                 )
 
+            elif action_id == 15:
+                target_dir = self.current_target_dir()
+
+                self.current_filename = make_watchlist_filename()
+                self.logger.info("ACTION | current filename set to %s", self.current_filename)
+                self.bridge.filename_changed.emit(self.current_filename)
+
+                self.controller.enter_watchlist_filename(self.current_filename, target_dir)
+
+            elif action_id == 16:
+                target_dir = self.current_target_dir()
+
+                self.current_filename = make_watchlist_filename()
+                self.logger.info("ACTION | current filename set to %s", self.current_filename)
+                self.bridge.filename_changed.emit(self.current_filename)
+
+                self.controller.enter_watchlist_filename_then_export_directory(
+                    self.current_filename,
+                    target_dir,
+                )
+
+            elif action_id == 17:
+                self.controller.confirm_watchlist_save()
+
+            elif action_id == 18:
+                self.controller.cancel_watchlist_export()
+
+            elif action_id == 19:
+                if not self.current_filename:
+                    raise RuntimeError("No current filename set. Run action 15 or 16 first.")
+
+                ok = self.controller.verify_save(
+                    self.current_filename,
+                    self.current_target_dir(),
+                )
+                self.logger.info(
+                    "VERIFY | watchlist filename=%s result=%s",
+                    self.current_filename,
+                    ok,
+                )
+
             else:
                 self.logger.warning("ACTION | unknown action id: %s", action_id)
 
@@ -501,7 +542,6 @@ class DebugPanel(QWidget):
     def on_action_finished(self) -> None:
         self.set_busy(False, "Ready")
         self.logger.info("PANEL | action finished")
-
 
 def main() -> int:
     cfg = load_scanner_config()
