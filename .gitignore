@@ -43,3 +43,4 @@ tmp/*
 secure/
 *.ecfg
 *.odp*
+*diagnostic*.txt
