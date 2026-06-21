@@ -22,7 +22,7 @@ pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.0
 
 
-class ToSDebugController:
+class ToSActionsController:
     """
     Controller for scripted ToS pseudo-widget interaction.
 
@@ -34,7 +34,7 @@ class ToSDebugController:
     - Serializes actions with a lock so actions do not overlap
     """
 
-    # Slow and deterministic for debug/observation
+    # Slow and deterministic for diagnostics/observation
     ENABLE_RANDOM_TIMING = True
     ENABLE_RANDOM_POSITION = True
 
@@ -161,7 +161,7 @@ class ToSDebugController:
         Enter only the filename into an export/save dialog.
 
         The export directory is expected to already be selected/remembered by
-        the dialog. The expected full path is logged for verification/debugging.
+        the dialog. The expected full path is logged for verification/diagnostics.
         """
         target_dir = Path(target_dir).expanduser().resolve()
         expected_path = target_dir / filename
@@ -389,43 +389,6 @@ class ToSDebugController:
 
             self._log("GUI | win_export detected")
 
-    # def enter_filename_then_export_directory(
-    #     self,
-    #     filename: str,
-    #     target_dir: str | Path,
-    # ) -> None:
-    #     """
-    #     First-time setup workflow for the scan export dialog.
-
-    #     Enter the filename while the save dialog is still in its usual geometry,
-    #     then enter the target directory. Changing the directory may shift the
-    #     filename field, but the filename has already been entered.
-    #     """
-    #     with self.action_lock:
-    #         target_dir = Path(target_dir).expanduser().resolve()
-    #         expected_path = target_dir / filename
-
-    #         self._log("ACTION | enter_filename_then_export_directory")
-    #         self._log("ACTION | filename -> %s", filename)
-    #         self._log("ACTION | target directory -> %s", target_dir)
-    #         self._log("ACTION | expected save path -> %s", expected_path)
-
-    #         self._bring_named_window_to_front("win_export")
-
-    #         self._move_center("ledit_exp_fname")
-    #         self._click()
-    #         self._select_all()
-    #         self._delete_selection()
-    #         self._type_text(filename)
-
-    #         self._move_center("ledit_exp_dir")
-    #         self._click()
-    #         self._select_all()
-    #         self._delete_selection()
-    #         self._type_text(str(target_dir))
-    #         pyautogui.press("enter")
-    #         self._sleep(1.0)
-
     def enter_filename_then_export_directory(
         self,
         filename: str,
@@ -440,8 +403,6 @@ class ToSDebugController:
                 target_dir=target_dir,
                 log_label="scan",
             )
-
-
 
     def enter_export_directory(self, target_dir: str | Path) -> None:
         """
@@ -464,33 +425,6 @@ class ToSDebugController:
             pyautogui.press("enter")
             self._sleep(1.0)
 
-
-    # def enter_filename(self, filename: str, target_dir: str | Path) -> None:
-    #     """
-    #     Enter only the CSV filename into the scan export filename field.
-
-    #     The target directory is expected to already be selected in the ToS save
-    #     dialog. The full path is logged for verification/debugging only.
-
-    #     Example typed text:
-    #         scan-2026-03-13-09-30-05-ToS.csv
-
-    #     Use confirm_save() to click Save.
-    #     """
-    #     with self.action_lock:
-    #         expected_path = Path(target_dir).expanduser().resolve() / filename
-
-    #         self._log("ACTION | enter_filename -> %s", filename)
-    #         self._log("ACTION | expected save path -> %s", expected_path)
-
-    #         self._bring_named_window_to_front("win_export")
-    #         self._move_center("ledit_exp_fname")
-    #         self._click()
-    #         self._sleep(0.5)
-    #         self._select_all()
-    #         self._delete_selection()
-    #         self._type_text(filename)
-
     def enter_filename(self, filename: str, target_dir: str | Path) -> None:
         with self.action_lock:
             self._enter_filename_in_export_dialog(
@@ -501,15 +435,6 @@ class ToSDebugController:
                 log_label="scan",
             )
 
-
-
-    # def confirm_save(self) -> None:
-    #     with self.action_lock:
-    #         self._log("ACTION | confirm_save")
-    #         self._bring_named_window_to_front("win_export")
-    #         self._move_vh("btn_exp_save")
-    #         self._click()
-
     def confirm_save(self) -> None:
         with self.action_lock:
             self._confirm_export_save(
@@ -518,22 +443,6 @@ class ToSDebugController:
                 log_label="scan",
             )
 
-
-    # def cancel_export(self) -> None:
-    #     self._log("ACTION | manual_init cancelling still-open save dialog")
-    #     self._bring_named_window_to_front("win_export")
-
-    #     try:
-    #         self._move_vh("btn_exp_cancel")
-    #         self._click()
-    #     except KeyError:
-    #         self._log(
-    #             "ACTION | manual_init could not find btn_exp_cancel; pressing Escape to close save dialog",
-    #             level="warning",
-    #         )
-    #         pyautogui.press("esc")
-
-
     def cancel_export(self) -> None:
         with self.action_lock:
             self._cancel_export_dialog(
@@ -541,7 +450,6 @@ class ToSDebugController:
                 cancel_button_widget="btn_exp_cancel",
                 log_label="scan",
             )
-
 
     def verify_save(
         self,
@@ -863,9 +771,9 @@ class ToSDebugController:
             self._log("ACTION | user_scan end")
 
 
-def install_debug_hotkeys(controller: ToSDebugController, make_filename, target_dir):
+def install_diagnostic_hotkeys(controller: ToSActionsController, make_filename, target_dir):
     """
-    Install manual diagnostic hotkeys for ToSDebugController.
+    Install manual diagnostic hotkeys for ToSActionsController.
 
     Returns the hotkey mapping so the caller can inspect/log it if desired.
 
@@ -899,7 +807,7 @@ def install_debug_hotkeys(controller: ToSDebugController, make_filename, target_
     listener = keyboard.GlobalHotKeys(hotkeys)
     listener.start()
 
-    controller._log("Installed debug hotkeys:")
+    controller._log("Installed diagnostic hotkeys:")
     for combo in hotkeys:
         controller._log("  %s", combo)
 

@@ -20,14 +20,13 @@ from PySide6.QtWidgets import (
 )
 
 from config import load_scanner_config
-from tos_pwidget_actions import ToSDebugController
+from tos_pwidget_actions import ToSActionsController
 
 
 def setup_logger(log_dir: Path) -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / f"tos-debug-menu-{datetime.now():%Y-%m-%d}.log"
-
-    logger = logging.getLogger("tos_debug_menu")
+    log_path = log_dir / f"tos-pwidget-menu-{datetime.now():%Y-%m-%d}.log"
+    logger = logging.getLogger("tos_pwidget_menu")
     logger.setLevel(logging.INFO)
     logger.propagate = False
 
@@ -58,18 +57,18 @@ def make_filename() -> str:
     return f"scan-{datetime.now():%Y-%m-%d-%H-%M-%S}-ToS.csv"
 
 
-class DebugMenuDialog(QDialog):
+class ActionsMenuDialog(QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.selected_action: Optional[int] = None
-        self.setWindowTitle("ToS Debug Actions")
+        self.setWindowTitle("ToS PWidget Actions")
         self.setModal(True)
         self.resize(420, 260)
 
         outer = QVBoxLayout(self)
 
         label = QLabel(
-            "Choose a debug action.\n"
+            "Choose a pwidget action.\n"
             "This dialog closes immediately after a button is pressed."
         )
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -107,11 +106,11 @@ class HotkeyBridge(QObject):
     show_menu_requested = Signal()
     quit_requested = Signal()
 
-class DebugMenuApp(QObject):
+class ActionsMenuApp(QObject):
     def __init__(
         self,
         *,
-        controller: ToSDebugController,
+        controller: ToSActionsController,
         target_dir: Path,
         logger: logging.Logger,
         app: QApplication,
@@ -145,7 +144,7 @@ class DebugMenuApp(QObject):
         )
         self.listener.start()
 
-        self.logger.info("Debug menu app started.")
+        self.logger.info("Actions menu app started.")
         self.logger.info("Global trigger: Ctrl+Alt+m")
         self.logger.info("Quit trigger:   Ctrl+Alt+q")
         self.logger.info("Target directory: %s", self.target_dir)
@@ -180,7 +179,7 @@ class DebugMenuApp(QObject):
             self.listener.stop()
         except Exception:
             pass
-        self.logger.info("Debug menu app stopped.")
+        self.logger.info("Actions menu app stopped.")
 
     @Slot()
     def show_menu(self) -> None:
@@ -192,7 +191,7 @@ class DebugMenuApp(QObject):
         self.logger.info("MENU | opening dialog")
 
         try:
-            dlg = DebugMenuDialog()
+            dlg = ActionsMenuDialog()
             result = dlg.exec()
 
             if result == QDialog.DialogCode.Accepted and dlg.selected_action is not None:                
@@ -273,7 +272,7 @@ def main() -> int:
     app = QApplication([])
     app.setQuitOnLastWindowClosed(False)
 
-    controller = ToSDebugController(
+    controller = ToSActionsController(
         layout_path=cfg.pwidget_yaml_path,
         cfg=cfg,
         logger=logger,
@@ -281,7 +280,7 @@ def main() -> int:
 
     target_dir = cfg.scans_path
 
-    menu_app = DebugMenuApp(
+    menu_app = ActionsMenuApp(
         controller=controller,
         target_dir=target_dir,
         logger=logger,

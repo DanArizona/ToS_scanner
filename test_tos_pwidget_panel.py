@@ -23,14 +23,14 @@ from PySide6.QtWidgets import (
 )
 
 from config import load_scanner_config
-from tos_pwidget_actions import ToSDebugController
+from tos_pwidget_actions import ToSActionsController
 
 
 def setup_logger(log_dir: Path) -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / f"tos-debug-panel-{datetime.now():%Y-%m-%d}.log"
 
-    logger = logging.getLogger("tos_debug_panel")
+    log_path = log_dir / f"tos-pwidget-panel-{datetime.now():%Y-%m-%d}.log"
+    logger = logging.getLogger("tos_pwidget_panel")
     logger.setLevel(logging.INFO)
     logger.propagate = False
 
@@ -97,11 +97,11 @@ class QtLogHandler(logging.Handler):
             pass
 
 
-class DebugPanel(QWidget):
+class ActionsPanel(QWidget):
     def __init__(
         self,
         *,
-        controller: ToSDebugController,
+        controller: ToSActionsController,
         layout_path: Path,
         target_dir: Path,
         logger: logging.Logger,
@@ -129,13 +129,13 @@ class DebugPanel(QWidget):
 
         self._build_ui()
 
-        self.logger.info("Debug panel started.")
+        self.logger.info("Actions panel started.")
         self.logger.info("Layout YAML: %s", self.layout_path)        
         self.logger.info("Target directory: %s", self.target_dir)
 
     def closeEvent(self, event) -> None:
         try:
-            self.logger.info("Debug panel closing.")
+            self.logger.info("Actions panel closing.")
             self.logger.removeHandler(self.qt_log_handler)
             self.qt_log_handler.close()
         except Exception:
@@ -290,7 +290,7 @@ class DebugPanel(QWidget):
 
         try:
             self.set_busy(True, "Reloading layout YAML ...")
-            self.controller = ToSDebugController(
+            self.controller = ToSActionsController(
                 layout_path=new_path,
                 cfg=self.controller.cfg,
                 logger=self.logger,
@@ -546,7 +546,7 @@ def main() -> int:
 
     app = QApplication([])
 
-    controller = ToSDebugController(
+    controller = ToSActionsController(
         layout_path=cfg.pwidget_yaml_path,
         cfg=cfg,
         logger=logger,
@@ -554,7 +554,7 @@ def main() -> int:
 
     target_dir = cfg.scans_path
 
-    panel = DebugPanel(
+    panel = ActionsPanel(
         controller=controller,
         layout_path=Path(cfg.pwidget_yaml_path),
         target_dir=target_dir,
