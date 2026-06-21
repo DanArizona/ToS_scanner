@@ -148,6 +148,101 @@ class ToSDebugController:
             time.sleep(0.05)
         return False
 
+    def _enter_filename_in_export_dialog(
+        self,
+        *,
+        window_name: str,
+        filename_widget: str,
+        filename: str,
+        target_dir: str | Path,
+        log_label: str,
+    ) -> None:
+        """
+        Enter only the filename into an export/save dialog.
+
+        The export directory is expected to already be selected/remembered by
+        the dialog. The expected full path is logged for verification/debugging.
+        """
+        target_dir = Path(target_dir).expanduser().resolve()
+        expected_path = target_dir / filename
+
+        self._log("ACTION | enter_%s_filename -> %s", log_label, filename)
+        self._log("ACTION | expected %s save path -> %s", log_label, expected_path)
+
+        self._bring_named_window_to_front(window_name)
+        self._move_center(filename_widget)
+        self._click()
+        self._sleep(0.5)
+        self._select_all()
+        self._delete_selection()
+        self._type_text(filename)
+
+
+    def _enter_filename_then_export_directory(
+        self,
+        *,
+        window_name: str,
+        filename_widget: str,
+        directory_widget: str,
+        filename: str,
+        target_dir: str | Path,
+        log_label: str,
+    ) -> None:
+        """
+        First-time setup workflow for an export/save dialog.
+
+        Enter the filename while the dialog is still in its usual geometry,
+        then enter the target directory. Changing the directory may shift the
+        filename field, but the filename has already been entered.
+        """
+        target_dir = Path(target_dir).expanduser().resolve()
+        expected_path = target_dir / filename
+
+        self._log("ACTION | enter_%s_filename_then_export_directory", log_label)
+        self._log("ACTION | filename -> %s", filename)
+        self._log("ACTION | target directory -> %s", target_dir)
+        self._log("ACTION | expected %s save path -> %s", log_label, expected_path)
+
+        self._bring_named_window_to_front(window_name)
+
+        self._move_center(filename_widget)
+        self._click()
+        self._select_all()
+        self._delete_selection()
+        self._type_text(filename)
+
+        self._move_center(directory_widget)
+        self._click()
+        self._select_all()
+        self._delete_selection()
+        self._type_text(str(target_dir))
+        pyautogui.press("enter")
+        self._sleep(1.0)
+
+    def _confirm_export_save(
+        self,
+        *,
+        window_name: str,
+        save_button_widget: str,
+        log_label: str,
+    ) -> None:
+        self._log("ACTION | confirm_%s_save", log_label)
+        self._bring_named_window_to_front(window_name)
+        self._move_vh(save_button_widget)
+        self._click()
+
+    def _cancel_export_dialog(
+        self,
+        *,
+        window_name: str,
+        cancel_button_widget: str,
+        log_label: str,
+    ) -> None:
+        self._log("ACTION | cancel_%s_export", log_label)
+        self._bring_named_window_to_front(window_name)
+        self._move_vh(cancel_button_widget)
+        self._click()
+
     # ------------------------------------------------------------------
     # Mouse / keyboard primitives
     # ------------------------------------------------------------------
@@ -209,6 +304,7 @@ class ToSDebugController:
         self._log("GUI | type text: %s", text)
         pyautogui.write(text, interval=interval_s)
         self._sleep(self.STEP_PAUSE_S)
+
 
     # ------------------------------------------------------------------
     # Future OCR hook
@@ -293,42 +389,58 @@ class ToSDebugController:
 
             self._log("GUI | win_export detected")
 
+    # def enter_filename_then_export_directory(
+    #     self,
+    #     filename: str,
+    #     target_dir: str | Path,
+    # ) -> None:
+    #     """
+    #     First-time setup workflow for the scan export dialog.
+
+    #     Enter the filename while the save dialog is still in its usual geometry,
+    #     then enter the target directory. Changing the directory may shift the
+    #     filename field, but the filename has already been entered.
+    #     """
+    #     with self.action_lock:
+    #         target_dir = Path(target_dir).expanduser().resolve()
+    #         expected_path = target_dir / filename
+
+    #         self._log("ACTION | enter_filename_then_export_directory")
+    #         self._log("ACTION | filename -> %s", filename)
+    #         self._log("ACTION | target directory -> %s", target_dir)
+    #         self._log("ACTION | expected save path -> %s", expected_path)
+
+    #         self._bring_named_window_to_front("win_export")
+
+    #         self._move_center("ledit_exp_fname")
+    #         self._click()
+    #         self._select_all()
+    #         self._delete_selection()
+    #         self._type_text(filename)
+
+    #         self._move_center("ledit_exp_dir")
+    #         self._click()
+    #         self._select_all()
+    #         self._delete_selection()
+    #         self._type_text(str(target_dir))
+    #         pyautogui.press("enter")
+    #         self._sleep(1.0)
+
     def enter_filename_then_export_directory(
         self,
         filename: str,
         target_dir: str | Path,
     ) -> None:
-        """
-        First-time setup workflow for the scan export dialog.
-
-        Enter the filename while the save dialog is still in its usual geometry,
-        then enter the target directory. Changing the directory may shift the
-        filename field, but the filename has already been entered.
-        """
         with self.action_lock:
-            target_dir = Path(target_dir).expanduser().resolve()
-            expected_path = target_dir / filename
+            self._enter_filename_then_export_directory(
+                window_name="win_export",
+                filename_widget="ledit_exp_fname",
+                directory_widget="ledit_exp_dir",
+                filename=filename,
+                target_dir=target_dir,
+                log_label="scan",
+            )
 
-            self._log("ACTION | enter_filename_then_export_directory")
-            self._log("ACTION | filename -> %s", filename)
-            self._log("ACTION | target directory -> %s", target_dir)
-            self._log("ACTION | expected save path -> %s", expected_path)
-
-            self._bring_named_window_to_front("win_export")
-
-            self._move_center("ledit_exp_fname")
-            self._click()
-            self._select_all()
-            self._delete_selection()
-            self._type_text(filename)
-
-            self._move_center("ledit_exp_dir")
-            self._click()
-            self._select_all()
-            self._delete_selection()
-            self._type_text(str(target_dir))
-            pyautogui.press("enter")
-            self._sleep(1.0)
 
 
     def enter_export_directory(self, target_dir: str | Path) -> None:
@@ -353,52 +465,83 @@ class ToSDebugController:
             self._sleep(1.0)
 
 
+    # def enter_filename(self, filename: str, target_dir: str | Path) -> None:
+    #     """
+    #     Enter only the CSV filename into the scan export filename field.
+
+    #     The target directory is expected to already be selected in the ToS save
+    #     dialog. The full path is logged for verification/debugging only.
+
+    #     Example typed text:
+    #         scan-2026-03-13-09-30-05-ToS.csv
+
+    #     Use confirm_save() to click Save.
+    #     """
+    #     with self.action_lock:
+    #         expected_path = Path(target_dir).expanduser().resolve() / filename
+
+    #         self._log("ACTION | enter_filename -> %s", filename)
+    #         self._log("ACTION | expected save path -> %s", expected_path)
+
+    #         self._bring_named_window_to_front("win_export")
+    #         self._move_center("ledit_exp_fname")
+    #         self._click()
+    #         self._sleep(0.5)
+    #         self._select_all()
+    #         self._delete_selection()
+    #         self._type_text(filename)
+
     def enter_filename(self, filename: str, target_dir: str | Path) -> None:
-        """
-        Enter only the CSV filename into the scan export filename field.
-
-        The target directory is expected to already be selected in the ToS save
-        dialog. The full path is logged for verification/debugging only.
-
-        Example typed text:
-            scan-2026-03-13-09-30-05-ToS.csv
-
-        Use confirm_save() to click Save.
-        """
         with self.action_lock:
-            expected_path = Path(target_dir).expanduser().resolve() / filename
+            self._enter_filename_in_export_dialog(
+                window_name="win_export",
+                filename_widget="ledit_exp_fname",
+                filename=filename,
+                target_dir=target_dir,
+                log_label="scan",
+            )
 
-            self._log("ACTION | enter_filename -> %s", filename)
-            self._log("ACTION | expected save path -> %s", expected_path)
 
-            self._bring_named_window_to_front("win_export")
-            self._move_center("ledit_exp_fname")
-            self._click()
-            self._sleep(0.5)
-            self._select_all()
-            self._delete_selection()
-            self._type_text(filename)
+
+    # def confirm_save(self) -> None:
+    #     with self.action_lock:
+    #         self._log("ACTION | confirm_save")
+    #         self._bring_named_window_to_front("win_export")
+    #         self._move_vh("btn_exp_save")
+    #         self._click()
 
     def confirm_save(self) -> None:
         with self.action_lock:
-            self._log("ACTION | confirm_save")
-            self._bring_named_window_to_front("win_export")
-            self._move_vh("btn_exp_save")
-            self._click()
+            self._confirm_export_save(
+                window_name="win_export",
+                save_button_widget="btn_exp_save",
+                log_label="scan",
+            )
+
+
+    # def cancel_export(self) -> None:
+    #     self._log("ACTION | manual_init cancelling still-open save dialog")
+    #     self._bring_named_window_to_front("win_export")
+
+    #     try:
+    #         self._move_vh("btn_exp_cancel")
+    #         self._click()
+    #     except KeyError:
+    #         self._log(
+    #             "ACTION | manual_init could not find btn_exp_cancel; pressing Escape to close save dialog",
+    #             level="warning",
+    #         )
+    #         pyautogui.press("esc")
+
 
     def cancel_export(self) -> None:
-        self._log("ACTION | manual_init cancelling still-open save dialog")
-        self._bring_named_window_to_front("win_export")
-
-        try:
-            self._move_vh("btn_exp_cancel")
-            self._click()
-        except KeyError:
-            self._log(
-                "ACTION | manual_init could not find btn_exp_cancel; pressing Escape to close save dialog",
-                level="warning",
+        with self.action_lock:
+            self._cancel_export_dialog(
+                window_name="win_export",
+                cancel_button_widget="btn_exp_cancel",
+                log_label="scan",
             )
-            pyautogui.press("esc")
+
 
     def verify_save(
         self,
@@ -480,21 +623,60 @@ class ToSDebugController:
 
             self._log("GUI | win_wl_export detected")
 
+    # def enter_watchlist_filename(self, filename: str, target_dir: str | Path) -> None:
+    #     with self.action_lock:
+    #         expected_path = Path(target_dir).expanduser().resolve() / filename
+
+    #         self._log("ACTION | enter_watchlist_filename -> %s", filename)
+    #         self._log("ACTION | expected watchlist save path -> %s", expected_path)
+
+    #         self._bring_named_window_to_front("win_wl_export")
+    #         self._move_center("ledit_wl_fname")
+    #         self._click()
+    #         self._sleep(0.5)
+    #         self._select_all()
+    #         self._delete_selection()
+    #         self._type_text(filename)
+
     def enter_watchlist_filename(self, filename: str, target_dir: str | Path) -> None:
         with self.action_lock:
-            expected_path = Path(target_dir).expanduser().resolve() / filename
+            self._enter_filename_in_export_dialog(
+                window_name="win_wl_export",
+                filename_widget="ledit_wl_fname",
+                filename=filename,
+                target_dir=target_dir,
+                log_label="watchlist",
+            )
 
-            self._log("ACTION | enter_watchlist_filename -> %s", filename)
-            self._log("ACTION | expected watchlist save path -> %s", expected_path)
+    # def enter_watchlist_filename_then_export_directory(
+    #     self,
+    #     filename: str,
+    #     target_dir: str | Path,
+    # ) -> None:
+    #     with self.action_lock:
+    #         target_dir = Path(target_dir).expanduser().resolve()
+    #         expected_path = target_dir / filename
 
-            self._bring_named_window_to_front("win_wl_export")
-            self._move_center("ledit_wl_fname")
-            self._click()
-            self._sleep(0.5)
-            self._select_all()
-            self._delete_selection()
-            self._type_text(filename)
+    #         self._log("ACTION | enter_watchlist_filename_then_export_directory")
+    #         self._log("ACTION | filename -> %s", filename)
+    #         self._log("ACTION | target directory -> %s", target_dir)
+    #         self._log("ACTION | expected watchlist save path -> %s", expected_path)
 
+    #         self._bring_named_window_to_front("win_wl_export")
+
+    #         self._move_center("ledit_wl_fname")
+    #         self._click()
+    #         self._select_all()
+    #         self._delete_selection()
+    #         self._type_text(filename)
+
+    #         self._move_center("ledit_wl_dir")
+    #         self._click()
+    #         self._select_all()
+    #         self._delete_selection()
+    #         self._type_text(str(target_dir))
+    #         pyautogui.press("enter")
+    #         self._sleep(1.0)
 
     def enter_watchlist_filename_then_export_directory(
         self,
@@ -502,45 +684,45 @@ class ToSDebugController:
         target_dir: str | Path,
     ) -> None:
         with self.action_lock:
-            target_dir = Path(target_dir).expanduser().resolve()
-            expected_path = target_dir / filename
+            self._enter_filename_then_export_directory(
+                window_name="win_wl_export",
+                filename_widget="ledit_wl_fname",
+                directory_widget="ledit_wl_dir",
+                filename=filename,
+                target_dir=target_dir,
+                log_label="watchlist",
+            )
 
-            self._log("ACTION | enter_watchlist_filename_then_export_directory")
-            self._log("ACTION | filename -> %s", filename)
-            self._log("ACTION | target directory -> %s", target_dir)
-            self._log("ACTION | expected watchlist save path -> %s", expected_path)
-
-            self._bring_named_window_to_front("win_wl_export")
-
-            self._move_center("ledit_wl_fname")
-            self._click()
-            self._select_all()
-            self._delete_selection()
-            self._type_text(filename)
-
-            self._move_center("ledit_wl_dir")
-            self._click()
-            self._select_all()
-            self._delete_selection()
-            self._type_text(str(target_dir))
-            pyautogui.press("enter")
-            self._sleep(1.0)
-
+    # def confirm_watchlist_save(self) -> None:
+    #     with self.action_lock:
+    #         self._log("ACTION | confirm_watchlist_save")
+    #         self._bring_named_window_to_front("win_wl_export")
+    #         self._move_vh("btn_wl_save")
+    #         self._click()
 
     def confirm_watchlist_save(self) -> None:
         with self.action_lock:
-            self._log("ACTION | confirm_watchlist_save")
-            self._bring_named_window_to_front("win_wl_export")
-            self._move_vh("btn_wl_save")
-            self._click()
+            self._confirm_export_save(
+                window_name="win_wl_export",
+                save_button_widget="btn_wl_save",
+                log_label="watchlist",
+            )
 
+    # def cancel_watchlist_export(self) -> None:
+    #     with self.action_lock:
+    #         self._log("ACTION | cancel_watchlist_export")
+    #         self._bring_named_window_to_front("win_wl_export")
+    #         self._move_vh("btn_wl_cancel")
+    #         self._click()
 
     def cancel_watchlist_export(self) -> None:
         with self.action_lock:
-            self._log("ACTION | cancel_watchlist_export")
-            self._bring_named_window_to_front("win_wl_export")
-            self._move_vh("btn_wl_cancel")
-            self._click()
+            self._cancel_export_dialog(
+                window_name="win_wl_export",
+                cancel_button_widget="btn_wl_cancel",
+                log_label="watchlist",
+            )
+
 
 
     # ------------------------------------------------------------------
