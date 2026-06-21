@@ -162,6 +162,14 @@ class ActionsPanel(QWidget):
         self.filename_value.setStyleSheet("font-family: Consolas, monospace;")
         outer.addWidget(self.filename_value)
 
+        self.symbols_edit = QTextEdit()
+        self.symbols_edit.setPlaceholderText("AAPL\nMSFT\nNVDA")
+        self.symbols_edit.setPlainText("AAPL\nMSFT\nNVDA")
+        self.symbols_edit.setFixedHeight(80)
+
+        outer.addWidget(QLabel("Watchlist symbols"))
+        outer.addWidget(self.symbols_edit)
+
         layout_row = QHBoxLayout()
         outer.addLayout(layout_row)
 
@@ -221,6 +229,8 @@ class ActionsPanel(QWidget):
             (17, "17 Confirm WL Save"),
             (18, "18 Cancel WL Export"),
             (19, "19 Verify WL Save"),
+            (20, "20 Replace WL Symbols"),
+            (21, "21 Add WL Symbols"),
         ]
 
         for idx, (action_id, text) in enumerate(action_specs):
@@ -335,6 +345,9 @@ class ActionsPanel(QWidget):
 
         self.target_dir = target_dir
         return target_dir
+
+    def current_symbol_text(self) -> str:
+        return self.symbols_edit.toPlainText().strip()
 
     def start_action(self, action_id: int) -> None:
         if self.busy:
@@ -473,6 +486,26 @@ class ActionsPanel(QWidget):
                     filename,
                     ok,
                 )
+
+            elif action_id == 20:
+                symbols = self.current_symbol_text()
+                if not symbols:
+                    raise RuntimeError(
+                        "No watchlist symbols provided. Refusing to continue because "
+                        "ToS can lock up if the clipboard is empty."
+                    )
+
+                self.controller.replace_watchlist_symbols(symbols)
+
+            elif action_id == 21:
+                symbols = self.current_symbol_text()
+                if not symbols:
+                    raise RuntimeError(
+                        "No watchlist symbols provided. Refusing to continue because "
+                        "ToS can lock up if the clipboard is empty."
+                    )
+
+                self.controller.add_watchlist_symbols(symbols)
 
             else:
                 self.logger.warning("ACTION | unknown action id: %s", action_id)

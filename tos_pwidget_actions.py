@@ -6,6 +6,7 @@ import random
 import threading
 import time
 import numpy as np
+import subprocess
 
 from pathlib import Path
 from typing import Optional
@@ -492,6 +493,116 @@ class ToSActionsController:
     # Watchlist actions
     # ------------------------------------------------------------------
 
+    def _require_symbol_text(self, symbols: str) -> str:
+        """
+        Validate symbol text before interacting with the ToS symbols import dialog.
+
+        ToS can lock up if the clipboard is empty when the symbols import
+        radio buttons are clicked, so refuse empty/whitespace-only input.
+        """
+        symbol_text = symbols.strip()
+        if not symbol_text:
+            raise RuntimeError(
+                "Refusing to open symbols import with empty symbol text. "
+                "The ToS symbols import dialog can lock up if the clipboard is empty."
+            )
+        return symbol_text
+
+    def put_symbols_on_clipboard(self, symbols: str) -> None:
+        """
+        Put symbol text on the Windows clipboard.
+
+        The text is passed through unchanged except for trimming leading/trailing
+        whitespace. Newline-separated symbols are recommended.
+        """
+        with self.action_lock:
+            symbol_text = self._require_symbol_text(symbols)
+
+            self._log("ACTION | put_symbols_on_clipboard")
+            self._log("ACTION | symbol text length -> %d", len(symbol_text))
+
+            subprocess.run(
+                ["clip"],
+                input=symbol_text,
+                text=True,
+                check=True,
+            )
+
+    def open_watchlist_symbols_import(self) -> None:
+        with self.action_lock:
+            self._log("ACTION | open_watchlist_symbols_import")
+            self._bring_named_window_to_front("win_wl_main")
+
+            self._move_center("btn_wl_actions")
+            self._click()
+            self._move_vh("pick_wl_import")
+            self._click()
+
+            if not self._wait_for_window("win_wl_symbols_import", timeout_s=2.0):
+                raise RuntimeError(
+                    "win_wl_symbols_import did not appear after watchlist import path."
+                )
+
+            self._log("GUI | win_wl_symbols_import detected")
+
+    def _apply_watchlist_symbols_from_clipboard(self, *, mode: str) -> None:
+        """
+        Apply symbols already on the clipboard in the symbols import dialog.
+
+        mode must be either "replace" or "add".
+        """
+        if mode not in {"replace", "add"}:
+            raise ValueError(f"Unsupported watchlist symbol import mode: {mode!r}")
+
+        mode_widget = {
+            "replace": "rbutt_si_replace",
+            "add": "rbutt_si_add",
+        }[mode]
+
+        self._log("ACTION | apply_watchlist_symbols_from_clipboard -> %s", mode)
+        self._bring_named_window_to_front("win_wl_symbols_import")
+
+        self._move_center("rbutt_si_paste")
+        self._click()
+
+        self._move_center(mode_widget)
+        self._click()
+
+        self._move_vh("btn_si_save")
+        self._click()
+
+    def replace_watchlist_symbols(self, symbols: str) -> None:
+        """
+        Replace the Default watchlist symbols using clipboard import.
+        """
+        symbol_text = self._require_symbol_text(symbols)
+
+        with self.action_lock:
+            self._log("ACTION | replace_watchlist_symbols")
+
+        self.put_symbols_on_clipboard(symbol_text)
+        self.select_watchlist_default()
+        self.open_watchlist_symbols_import()
+
+        with self.action_lock:
+            self._apply_watchlist_symbols_from_clipboard(mode="replace")
+
+    def add_watchlist_symbols(self, symbols: str) -> None:
+        """
+        Add symbols to the Default watchlist using clipboard import.
+        """
+        symbol_text = self._require_symbol_text(symbols)
+
+        with self.action_lock:
+            self._log("ACTION | add_watchlist_symbols")
+
+        self.put_symbols_on_clipboard(symbol_text)
+        self.select_watchlist_default()
+        self.open_watchlist_symbols_import()
+
+        with self.action_lock:
+            self._apply_watchlist_symbols_from_clipboard(mode="add")
+
     def select_watchlist_default(self) -> None:
         with self.action_lock:
             self._log("ACTION | select_watchlist_default")
@@ -531,21 +642,6 @@ class ToSActionsController:
 
             self._log("GUI | win_wl_export detected")
 
-    # def enter_watchlist_filename(self, filename: str, target_dir: str | Path) -> None:
-    #     with self.action_lock:
-    #         expected_path = Path(target_dir).expanduser().resolve() / filename
-
-    #         self._log("ACTION | enter_watchlist_filename -> %s", filename)
-    #         self._log("ACTION | expected watchlist save path -> %s", expected_path)
-
-    #         self._bring_named_window_to_front("win_wl_export")
-    #         self._move_center("ledit_wl_fname")
-    #         self._click()
-    #         self._sleep(0.5)
-    #         self._select_all()
-    #         self._delete_selection()
-    #         self._type_text(filename)
-
     def enter_watchlist_filename(self, filename: str, target_dir: str | Path) -> None:
         with self.action_lock:
             self._enter_filename_in_export_dialog(
@@ -555,36 +651,6 @@ class ToSActionsController:
                 target_dir=target_dir,
                 log_label="watchlist",
             )
-
-    # def enter_watchlist_filename_then_export_directory(
-    #     self,
-    #     filename: str,
-    #     target_dir: str | Path,
-    # ) -> None:
-    #     with self.action_lock:
-    #         target_dir = Path(target_dir).expanduser().resolve()
-    #         expected_path = target_dir / filename
-
-    #         self._log("ACTION | enter_watchlist_filename_then_export_directory")
-    #         self._log("ACTION | filename -> %s", filename)
-    #         self._log("ACTION | target directory -> %s", target_dir)
-    #         self._log("ACTION | expected watchlist save path -> %s", expected_path)
-
-    #         self._bring_named_window_to_front("win_wl_export")
-
-    #         self._move_center("ledit_wl_fname")
-    #         self._click()
-    #         self._select_all()
-    #         self._delete_selection()
-    #         self._type_text(filename)
-
-    #         self._move_center("ledit_wl_dir")
-    #         self._click()
-    #         self._select_all()
-    #         self._delete_selection()
-    #         self._type_text(str(target_dir))
-    #         pyautogui.press("enter")
-    #         self._sleep(1.0)
 
     def enter_watchlist_filename_then_export_directory(
         self,
@@ -601,13 +667,6 @@ class ToSActionsController:
                 log_label="watchlist",
             )
 
-    # def confirm_watchlist_save(self) -> None:
-    #     with self.action_lock:
-    #         self._log("ACTION | confirm_watchlist_save")
-    #         self._bring_named_window_to_front("win_wl_export")
-    #         self._move_vh("btn_wl_save")
-    #         self._click()
-
     def confirm_watchlist_save(self) -> None:
         with self.action_lock:
             self._confirm_export_save(
@@ -616,13 +675,6 @@ class ToSActionsController:
                 log_label="watchlist",
             )
 
-    # def cancel_watchlist_export(self) -> None:
-    #     with self.action_lock:
-    #         self._log("ACTION | cancel_watchlist_export")
-    #         self._bring_named_window_to_front("win_wl_export")
-    #         self._move_vh("btn_wl_cancel")
-    #         self._click()
-
     def cancel_watchlist_export(self) -> None:
         with self.action_lock:
             self._cancel_export_dialog(
@@ -630,8 +682,6 @@ class ToSActionsController:
                 cancel_button_widget="btn_wl_cancel",
                 log_label="watchlist",
             )
-
-
 
     # ------------------------------------------------------------------
     # Misc / diagnostics
