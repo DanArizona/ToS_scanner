@@ -9,12 +9,12 @@ from pathlib import Path
 from pynput import keyboard
 
 from config import load_scanner_config
-from tos_pwidget_actions import ToSDebugController, install_debug_hotkeys
+from tos_pwidget_actions import ToSActionsController, install_diagnostic_hotkeys
 
 
 def setup_logger(log_dir: Path) -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / f"tos-debug-actions-{datetime.now():%Y-%m-%d}.log"
+    log_path = log_dir / f"tos-pwidget-actions-{datetime.now():%Y-%m-%d}.log"
 
     logger = logging.getLogger("tos_pwidget_actions")
     logger.setLevel(logging.INFO)
@@ -52,7 +52,7 @@ def main() -> int:
     log_dir = Path("logs")
     logger = setup_logger(log_dir)
 
-    controller = ToSDebugController(
+    controller = ToSActionsController(
         layout_path=cfg.pwidget_yaml_path,
         cfg=cfg,
         logger=logger,
@@ -60,7 +60,7 @@ def main() -> int:
 
     target_dir = cfg.scans_path
 
-    logger.info("Debug hotkeys active:")
+    logger.info("Diagnostic hotkeys active:")
     logger.info("  Ctrl+Shift+1   open_scan_tab")
     logger.info("  Ctrl+Shift+2   load_scan50_query")
     logger.info("  Ctrl+Shift+3   load_pct_gainers_query")
@@ -73,7 +73,7 @@ def main() -> int:
     logger.info("  Ctrl+Shift+11  nop")
     logger.info("Press Esc to quit.")
 
-    hotkey_listener  = install_debug_hotkeys(controller, make_filename, target_dir)
+    hotkey_listener  = install_diagnostic_hotkeys(controller, make_filename, target_dir)
     hotkey_listener .start()
 
     def stop_on_esc(key):

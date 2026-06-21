@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 
 from config import ScannerConfig
 from layout import load_widget_layout
-from tos_pwidget_actions import ToSDebugController
+from tos_pwidget_actions import ToSActionsController
 
 
 ET = ZoneInfo("America/New_York")
@@ -43,7 +43,7 @@ class ScanExporter(Protocol):
 
 class ToSPseudoWidgetExporter:
     """
-    Reuses the tested ToSDebugController sequence:
+    Reuses the tested ToSActionsController sequence:
       export_csv_file()
       enter_filename(filename, target_dir)
       confirm_save()
@@ -66,7 +66,7 @@ class ToSPseudoWidgetExporter:
         self.dry_run = dry_run
         self.verify_timeout_s = verify_timeout_s
 
-        self.controller = ToSDebugController(
+        self.controller = ToSActionsController(
             layout_path=layout_path or cfg.pwidget_yaml_path,
             cfg=cfg,
             logger=logger,
