@@ -231,6 +231,8 @@ class ActionsPanel(QWidget):
             (19, "19 Verify WL Save"),
             (20, "20 Replace WL Symbols"),
             (21, "21 Add WL Symbols"),
+            (22, "22 Normalize Scan Export Dialog"),
+            (23, "23 Normalize WL Export Dialog"),
         ]
 
         for idx, (action_id, text) in enumerate(action_specs):
@@ -437,6 +439,7 @@ class ActionsPanel(QWidget):
                 self.logger.info("ACTION | current filename set to %s", self.current_filename)
                 self.bridge.filename_changed.emit(self.current_filename)
 
+                self.controller.normalize_scan_export_dialog()
                 self.controller.enter_filename_then_export_directory(
                     self.current_filename,
                     target_dir,
@@ -458,6 +461,7 @@ class ActionsPanel(QWidget):
                 self.logger.info("ACTION | current filename set to %s", self.current_filename)
                 self.bridge.filename_changed.emit(self.current_filename)
 
+                self.controller.normalize_watchlist_export_dialog()
                 self.controller.enter_watchlist_filename_then_export_directory(
                     self.current_filename,
                     target_dir,
@@ -506,6 +510,12 @@ class ActionsPanel(QWidget):
                     )
 
                 self.controller.add_watchlist_symbols(symbols)
+
+            elif action_id == 22:
+                self.controller.normalize_scan_export_dialog()
+
+            elif action_id == 23:
+                self.controller.normalize_watchlist_export_dialog()
 
             else:
                 self.logger.warning("ACTION | unknown action id: %s", action_id)

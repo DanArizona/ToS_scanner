@@ -365,6 +365,97 @@ class ToSActionsController:
             )
 
 
+    def normalize_window_size(self, window_name: str) -> None:
+        """
+        Resize an open ToS window/dialog to the YAML root size, then verify it.
+
+        Intended for setup/initialization workflows, not for every recurring
+        export action.
+        """
+        with self.action_lock:
+            win = self._bring_named_window_to_front(window_name)
+
+            expected_w, expected_h = self._widget_size(window_name)
+
+            actual_w = int(getattr(win, "width"))
+            actual_h = int(getattr(win, "height"))
+
+            self._log(
+                "GUI | normalize window size -> %s expected=%sx%s actual=%sx%s",
+                window_name,
+                expected_w,
+                expected_h,
+                actual_w,
+                actual_h,
+            )
+
+            resize_to = getattr(win, "resizeTo", None)
+            if resize_to is None:
+                raise RuntimeError(
+                    f"{window_name} window object does not support resizeTo()."
+                )
+
+            resize_to(expected_w, expected_h)
+            self._sleep(1.0)
+
+            if not self._wait_for_window(window_name, timeout_s=3.0):
+                raise RuntimeError(f"{window_name} is not open after resize.")
+
+            win = self._get_matching_window(window_name)
+            if win is None:
+                raise RuntimeError(f"{window_name} could not be re-fetched after resize.")
+
+            self._assert_window_size(window_name, win=win)
+
+
+            # resize_to(expected_w, expected_h)
+            # self._sleep(1.0)
+
+            # # Re-fetch after resize because some window objects may not refresh
+            # # width/height properties immediately.
+            # win = self._get_matching_window(window_name)
+            # if win is None:
+            #     raise RuntimeError(f"{window_name} is not open after resize.")
+
+            # self._assert_window_size(window_name, win=win)
+
+
+    # def normalize_window_size(self, window_name: str) -> None:
+    #     """
+    #     Resize an open ToS window/dialog to the YAML root size, then verify it.
+
+    #     Intended for setup/initialization workflows, not for every recurring
+    #     export action.
+    #     """
+    #     with self.action_lock:
+    #         win = self._bring_named_window_to_front(window_name)
+
+    #         expected_w, expected_h = self._widget_size(window_name)
+
+    #         self._log(
+    #             "GUI | normalize window size -> %s expected=%sx%s actual=%sx%s",
+    #             window_name,
+    #             expected_w,
+    #             expected_h,
+    #             int(win.width),
+    #             int(win.height),
+    #         )
+
+    #         win.resizeTo(expected_w, expected_h)
+    #         self._sleep(1.0)
+
+    #         # Re-fetch after resize because some window objects may not refresh
+    #         # width/height properties immediately.
+    #         win = self._get_matching_window(window_name)
+    #         self._assert_window_size(window_name, win=win)
+
+    def normalize_scan_export_dialog(self) -> None:
+        self.normalize_window_size("win_export")
+
+
+    def normalize_watchlist_export_dialog(self) -> None:
+        self.normalize_window_size("win_wl_export")
+
 
     # ------------------------------------------------------------------
     # Mouse / keyboard primitives
