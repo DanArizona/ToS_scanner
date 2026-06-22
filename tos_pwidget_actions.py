@@ -22,7 +22,6 @@ from models import WidgetStack
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.0
 
-
 class ToSActionsController:
     """
     Controller for scripted ToS pseudo-widget interaction.
@@ -52,6 +51,8 @@ class ToSActionsController:
     SEGMENT_DURATION_S = 0.20
     CLICK_PAUSE_S = 0.20
     STEP_PAUSE_S = 0.30
+    WINDOW_SIZE_TOLERANCE_PX = 4
+
 
     def __init__(
         self,
@@ -139,6 +140,8 @@ class ToSActionsController:
         self._log("GUI | bring window to front: %s -> %s", widget_name, win.title)
         self._sleep(self.STEP_PAUSE_S)
 
+        return win
+
     def _wait_for_window(self, widget_name: str, timeout_s: float = 2.0) -> bool:
         title_prefix = self.cfg.title_map[widget_name]
         deadline = time.monotonic() + timeout_s
@@ -170,7 +173,11 @@ class ToSActionsController:
         self._log("ACTION | enter_%s_filename -> %s", log_label, filename)
         self._log("ACTION | expected %s save path -> %s", log_label, expected_path)
 
-        self._bring_named_window_to_front(window_name)
+        # self._bring_named_window_to_front(window_name)
+        # self._assert_window_size(window_name)
+        win = self._bring_named_window_to_front(window_name)
+        self._assert_window_size(window_name, win=win)
+
         self._move_center(filename_widget)
         self._click()
         self._sleep(0.5)
@@ -204,7 +211,10 @@ class ToSActionsController:
         self._log("ACTION | target directory -> %s", target_dir)
         self._log("ACTION | expected %s save path -> %s", log_label, expected_path)
 
-        self._bring_named_window_to_front(window_name)
+        # self._bring_named_window_to_front(window_name)
+        # self._assert_window_size(window_name)
+        win = self._bring_named_window_to_front(window_name)
+        self._assert_window_size(window_name, win=win)
 
         self._move_center(filename_widget)
         self._click()
@@ -228,7 +238,12 @@ class ToSActionsController:
         log_label: str,
     ) -> None:
         self._log("ACTION | confirm_%s_save", log_label)
-        self._bring_named_window_to_front(window_name)
+
+        # self._bring_named_window_to_front(window_name)
+        # self._assert_window_size(window_name)
+        win = self._bring_named_window_to_front(window_name)
+        self._assert_window_size(window_name, win=win)
+
         self._move_vh(save_button_widget)
         self._click()
 
@@ -240,9 +255,116 @@ class ToSActionsController:
         log_label: str,
     ) -> None:
         self._log("ACTION | cancel_%s_export", log_label)
-        self._bring_named_window_to_front(window_name)
+
+        # self._bring_named_window_to_front(window_name)
+        # self._assert_window_size(window_name)
+        win = self._bring_named_window_to_front(window_name)
+        self._assert_window_size(window_name, win=win)
+
         self._move_vh(cancel_button_widget)
         self._click()
+
+    # def _widget_size(self, widget_name: str) -> tuple[int, int]:
+    #     """
+    #     Return expected widget/window size from the loaded YAML layout.
+    #     """
+    #     widget = self._widget(widget_name)
+
+    #     # Most likely case for your current models.
+    #     if hasattr(widget, "width") and hasattr(widget, "height"):
+    #         return int(widget.width), int(widget.height)
+
+    #     # Fallback if the dimensions live on a nested region/bbox object.
+    #     for attr_name in ("region", "bbox"):
+    #         region = getattr(widget, attr_name, None)
+    #         if region is not None and hasattr(region, "width") and hasattr(region, "height"):
+    #             return int(region.width), int(region.height)
+
+    #     raise RuntimeError(f"Could not determine expected size for widget {widget_name!r}")
+    
+
+    def _widget_size(self, widget_name: str) -> tuple[int, int]:
+        """
+        Return expected widget/window size from the loaded YAML layout.
+        """
+        widget = self._widget(widget_name)
+
+        width = getattr(widget, "width", None)
+        height = getattr(widget, "height", None)
+
+        if width is not None and height is not None:
+            return int(width), int(height)
+
+        # Fallback if the dimensions live on a nested region/bbox object.
+        for attr_name in ("region", "bbox"):
+            region = getattr(widget, attr_name, None)
+            if region is None:
+                continue
+
+            width = getattr(region, "width", None)
+            height = getattr(region, "height", None)
+
+            if width is not None and height is not None:
+                return int(width), int(height)
+
+        raise RuntimeError(f"Could not determine expected size for widget {widget_name!r}")
+
+
+
+    def _assert_window_size(
+        self,
+        window_name: str,
+        *,
+        win=None,
+        tolerance_px: int | None = None,
+    ) -> None:
+        """
+        Verify that an open ToS window/dialog matches the YAML root size.
+
+        This is important for save dialogs because resizing the dialog changes
+        child widget locations relative to the YAML layout.
+        """
+        tolerance = self.WINDOW_SIZE_TOLERANCE_PX if tolerance_px is None else tolerance_px
+
+        expected_w, expected_h = self._widget_size(window_name)
+
+        # win = self._get_matching_window(window_name)
+        # if win is None:
+        #     raise RuntimeError(f"{window_name} is not open; cannot check size.")
+
+
+        if win is None:
+            win = self._get_matching_window(window_name)
+
+        if win is None:
+            raise RuntimeError(f"{window_name} is not open; cannot check size.")
+    
+        actual_w = int(win.width)
+        actual_h = int(win.height)
+
+        dw = abs(actual_w - expected_w)
+        dh = abs(actual_h - expected_h)
+
+        self._log(
+            "GUI | window size check -> %s expected=%sx%s actual=%sx%s tolerance=%s",
+            window_name,
+            expected_w,
+            expected_h,
+            actual_w,
+            actual_h,
+            tolerance,
+        )
+
+        if dw > tolerance or dh > tolerance:
+            raise RuntimeError(
+                f"{window_name} size mismatch: "
+                f"expected {expected_w}x{expected_h}, "
+                f"actual {actual_w}x{actual_h}, "
+                f"tolerance {tolerance}px. "
+                "Resize the dialog to match the YAML layout before continuing."
+            )
+
+
 
     # ------------------------------------------------------------------
     # Mouse / keyboard primitives
