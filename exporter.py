@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Protocol
 from zoneinfo import ZoneInfo
+from scheduler import ET
 
 from config import ScannerConfig
 from layout import load_widget_layout
@@ -86,9 +87,6 @@ class ToSPseudoWidgetExporter:
     def _check_stop(self, stop_event: Optional[threading.Event]) -> None:
         if stop_event is not None and stop_event.is_set():
             raise InterruptedError("Stop requested during export sequence.")
-
-
-
 
     def setup_scan_export_dialog(
         self,
@@ -170,53 +168,6 @@ class ToSPseudoWidgetExporter:
 
         self.logger.info("GUI | Scan export dialog setup complete")
 
-
-
-    # def setup_scan_export_dialog(
-    #     self,
-    #     *,
-    #     target_dir: Path,
-    #     stop_event: Optional[threading.Event] = None,
-    #     setup_filename: str = "__scan_export_setup__.csv",
-    # ) -> None:
-        # """
-        # One-time setup for the scan export dialog.
-
-        # Opens the scan export dialog, normalizes the dialog size to the YAML
-        # geometry, sets the export directory, then cancels the dialog.
-
-        # Recurring exports should then only enter the filename and save.
-        # """
-        # self.logger.info("GUI | Begin scan export dialog setup")
-        # self.logger.info("GUI | Setup export directory: %s", target_dir)
-
-        # if self.dry_run:
-        #     self.logger.info("DRY RUN | scan export dialog setup skipped")
-        #     return
-
-        # target_dir = Path(target_dir).expanduser().resolve()
-        # target_dir.mkdir(parents=True, exist_ok=True)
-
-        # with self.controller.action_lock:
-        #     self._check_stop(stop_event)
-
-        #     self.controller.export_csv_file()
-        #     self._check_stop(stop_event)
-
-        #     self.controller.normalize_scan_export_dialog()
-        #     self._check_stop(stop_event)
-
-        #     self.controller.enter_filename_then_export_directory(
-        #         setup_filename,
-        #         target_dir,
-        #     )
-        #     self._check_stop(stop_event)
-
-        #     self.controller.cancel_export()
-
-        # self.logger.info("GUI | Scan export dialog setup complete")
-
-
     def export_scan(
         self,
         csv_path: Path,
@@ -272,3 +223,48 @@ class ToSPseudoWidgetExporter:
         self._check_stop(stop_event)
         self.controller.user_scan(pre_wait_s=1.0)
 
+    def scan_and_export_now(
+        self,
+        *,
+        output_dir: Path,
+        stop_event: Optional[threading.Event] = None,
+    ) -> Path:
+        """
+        Perform an immediate ToS scan refresh, then export the results to CSV.
+
+        This is the manual "Scan and Export CSV" workflow. It uses the current
+        ToS export dialog directory, so Manual Init should be run first after
+        changing the output directory.
+        """
+        output_dir = Path(output_dir).expanduser().resolve()
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        now_et = datetime.now(ET)
+        filename = f"scan-{now_et:%Y-%m-%d-%H-%M-%S}-ToS-manual.csv"
+        csv_path = output_dir / filename
+
+        self.logger.info("GUI | Begin manual scan and export")
+        self.logger.info("GUI | Manual CSV filename: %s", filename)
+        self.logger.info("GUI | Manual CSV target: %s", csv_path)
+
+        if self.dry_run:
+            csv_path.write_text(
+                "symbol,source\nDRYRUN,manual-scan-export\n",
+                encoding="utf-8",
+            )
+            self.logger.info("DRY RUN | Manual stub CSV created at %s", csv_path)
+            return csv_path
+
+        self.perform_user_scan(stop_event=stop_event)
+        self._check_stop(stop_event)
+
+        # Give ToS a short moment to refresh the displayed scan results after
+        # pressing the scan button before opening the export dialog.
+        time.sleep(1.0)
+        self._check_stop(stop_event)
+
+        self.export_scan(csv_path, now_et, stop_event=stop_event)
+
+        self.logger.info("GUI | Manual scan and export complete: %s", csv_path)
+        return csv_path
+    
