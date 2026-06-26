@@ -619,6 +619,7 @@ class ToSActionsController:
                 log_label="scan",
             )
 
+
     def verify_save(
         self,
         target_dir: str | Path,
@@ -626,6 +627,7 @@ class ToSActionsController:
         timeout_s: float = 5.0,
         stable_window_s: float = 0.4,
         poll_s: float = 0.1,
+        stop_event=None,
     ) -> bool:
         """
         Verify that the file exists and its size has stabilized.
@@ -639,6 +641,11 @@ class ToSActionsController:
             stable_since: Optional[float] = None
 
             while time.monotonic() < deadline:
+                if stop_event is not None and stop_event.is_set():
+                    raise InterruptedError(
+                        "Stop requested while waiting for CSV save verification."
+                    )
+
                 if path.exists():
                     size = path.stat().st_size
                     if last_size == size:
@@ -655,6 +662,43 @@ class ToSActionsController:
 
             self._log("VERIFY | save not confirmed within timeout: %s", path)
             return False
+
+    # def verify_save(
+    #     self,
+    #     target_dir: str | Path,
+    #     filename: str,
+    #     timeout_s: float = 5.0,
+    #     stable_window_s: float = 0.4,
+    #     poll_s: float = 0.1,
+    # ) -> bool:
+    #     """
+    #     Verify that the file exists and its size has stabilized.
+    #     """
+    #     with self.action_lock:
+    #         path = Path(target_dir) / filename
+    #         self._log("ACTION | verify_save -> %s", path)
+
+    #         deadline = time.monotonic() + timeout_s
+    #         last_size: Optional[int] = None
+    #         stable_since: Optional[float] = None
+
+    #         while time.monotonic() < deadline:
+    #             if path.exists():
+    #                 size = path.stat().st_size
+    #                 if last_size == size:
+    #                     if stable_since is None:
+    #                         stable_since = time.monotonic()
+    #                     elif time.monotonic() - stable_since >= stable_window_s:
+    #                         self._log("VERIFY | save complete: %s size=%d", path, size)
+    #                         return True
+    #                 else:
+    #                     last_size = size
+    #                     stable_since = None
+
+    #             time.sleep(poll_s)
+
+    #         self._log("VERIFY | save not confirmed within timeout: %s", path)
+    #         return False
 
     # ------------------------------------------------------------------
     # Watchlist actions

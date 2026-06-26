@@ -9,6 +9,7 @@ runner, heartbeat, exporter, and shared state.
 
 from __future__ import annotations
 
+import os
 import argparse
 import logging
 import threading
@@ -65,6 +66,39 @@ class ScanControlManager:
     def is_running(self) -> bool:
         return self.runner_thread is not None and self.runner_thread.is_alive()
 
+    def _current_stop_event_for_action(self) -> Optional[threading.Event]:
+        if self.is_running():
+            return self.stop_event
+        return None
+
+
+
+    def get_output_dir(self) -> Path:
+        return Path(self.output_dir)
+
+    def set_output_dir(self, output_dir: str | Path) -> Path:
+        if self.is_running():
+            raise RuntimeError("Cannot change output directory while scan loop is active.")
+
+        raw = str(output_dir).strip()
+        if not raw:
+            raise ValueError("Output directory cannot be blank.")
+
+        candidate = Path(os.path.expandvars(raw)).expanduser().resolve()
+        candidate.mkdir(parents=True, exist_ok=True)
+
+        if not candidate.is_dir():
+            raise NotADirectoryError(f"Not a directory: {candidate}")
+
+        self.output_dir = candidate
+        self.logger.info("UI | output_dir changed to %s", self.output_dir)
+        self.logger.info("UI | Run Manual init to apply this directory to the ToS export dialog.")
+
+        return self.output_dir
+
+    def is_dry_run(self) -> bool:
+        return bool(self.args.dry_run)
+
     def set_gate_active(self, value: bool) -> None:
         if self.flags is not None:
             self.flags.set_gate_active(value)
@@ -97,8 +131,12 @@ class ScanControlManager:
 
     def _run_user_scan_now(self) -> None:
         try:
+            # exporter = self._ensure_exporter()
+            # exporter.perform_user_scan(stop_event=self.stop_event)
             exporter = self._ensure_exporter()
-            exporter.perform_user_scan(stop_event=self.stop_event)
+            exporter.perform_user_scan(
+                stop_event=self._current_stop_event_for_action(),
+            )
         except Exception:
             self.logger.exception("UI | Immediate user scan failed.")
         finally:
@@ -224,10 +262,14 @@ class ScanControlManager:
             # args=("manual_init", lambda ctl: ctl.manual_init()),
             args=(
                 "manual_init",
+                # lambda exporter: exporter.setup_scan_export_dialog(
+                #     target_dir=self.output_dir,
+                #     stop_event=self.stop_event,
+                # ),
                 lambda exporter: exporter.setup_scan_export_dialog(
                     target_dir=self.output_dir,
-                    stop_event=self.stop_event,
-                ),
+                    stop_event=None,
+                ),                
             ),
             daemon=True,
             name="ManualInit",

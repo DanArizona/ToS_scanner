@@ -20,17 +20,19 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
-    QComboBox,
+    # QComboBox,
     QFrame,
+    QFileDialog,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QButtonGroup,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QRadioButton,
-    QTextEdit,
+    # QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -77,7 +79,8 @@ class ScanControlPanel(QWidget):
 
         self.setWindowTitle("JTM Scan Manager")
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.resize(340, 460)
+        # self.resize(340, 460)
+        self.resize(430, 540)
         self.move(20, 20)
 
         self._build_ui()
@@ -151,6 +154,36 @@ class ScanControlPanel(QWidget):
         self.scan_btn = QPushButton("Press ToS Scan")
         self.scan_btn.clicked.connect(self.on_scan_clicked)
         maint_col.addWidget(self.scan_btn)
+
+        # -------------------- start of output-directory group --------------------
+
+        output_group = QGroupBox("Output directory")
+        output_layout = QVBoxLayout(output_group)
+        output_layout.setSpacing(8)
+
+        self.output_dir_edit = QLineEdit(str(self.manager.get_output_dir()))
+        self.output_dir_edit.setToolTip("Directory where scan CSV files will be saved.")
+        output_layout.addWidget(self.output_dir_edit)
+
+        output_button_row = QHBoxLayout()
+        output_button_row.setSpacing(8)
+        output_layout.addLayout(output_button_row)
+
+        self.output_browse_btn = QPushButton("Browse")
+        self.output_browse_btn.clicked.connect(self.on_output_browse_clicked)
+        output_button_row.addWidget(self.output_browse_btn)
+
+        self.output_apply_btn = QPushButton("Apply")
+        self.output_apply_btn.clicked.connect(self.on_output_apply_clicked)
+        output_button_row.addWidget(self.output_apply_btn)
+
+        output_hint = QLabel("Apply, then run Manual init before starting the scan loop.")
+        output_hint.setWordWrap(True)
+        output_layout.addWidget(output_hint)
+
+        outer.addWidget(output_group)
+
+        # -------------------- end of output-directory group --------------------
 
         line1 = QFrame()
         line1.setFrameShape(QFrame.Shape.HLine)
@@ -249,6 +282,20 @@ class ScanControlPanel(QWidget):
                 border: 1px solid #444444;
             }
 
+            QLineEdit {
+                background-color: #2b2b2b;
+                color: #f2f2f2;
+                border: 1px solid #666666;
+                border-radius: 4px;
+                padding: 5px 7px;
+            }
+
+            QLineEdit:disabled {
+                background-color: #202020;
+                color: #888888;
+                border: 1px solid #444444;
+            }
+
             QRadioButton {
                 spacing: 6px;
             }
@@ -281,6 +328,13 @@ class ScanControlPanel(QWidget):
         self.unlock_scan_btn.setEnabled(False)
         self.scan_btn.setEnabled(False)
         self.scan_status_value.setText("Stopped")
+
+        self._set_output_dir_controls_enabled(False)
+
+    def _set_output_dir_controls_enabled(self, enabled: bool) -> None:
+        self.output_dir_edit.setEnabled(enabled)
+        self.output_browse_btn.setEnabled(enabled)
+        self.output_apply_btn.setEnabled(enabled)
 
     def _production_mode(self) -> bool:
         return self.radio_production.isChecked()
@@ -318,6 +372,7 @@ class ScanControlPanel(QWidget):
             self.manual_init_btn.setEnabled(False)
             self.unlock_scan_btn.setEnabled(False)
             self.scan_btn.setEnabled(False)
+            self._set_output_dir_controls_enabled(False)
             return
 
         running = self.manager.is_running()
@@ -339,6 +394,7 @@ class ScanControlPanel(QWidget):
         self.unlock_scan_btn.setEnabled(not self.exit_requested)
         self.scan_btn.setEnabled(not self.exit_requested)
         self.exit_btn.setEnabled(True)
+        self._set_output_dir_controls_enabled(not running and not self.exit_requested)
 
     @Slot(int)
     def on_log_level_seen(self, levelno: int) -> None:
@@ -433,6 +489,78 @@ class ScanControlPanel(QWidget):
             app = QApplication.instance()
             if app is not None:
                 app.quit()
+
+    @Slot()
+    def on_output_browse_clicked(self) -> None:
+        if self.manager.is_running():
+            QMessageBox.warning(
+                self,
+                "Scanner Running",
+                "Stop the scan loop before changing the output directory.",
+            )
+            return
+
+        current_text = self.output_dir_edit.text().strip()
+        start_dir = current_text if current_text else str(self.manager.get_output_dir())
+
+        selected = QFileDialog.getExistingDirectory(
+            self,
+            "Select scan output directory",
+            start_dir,
+        )
+
+        if selected:
+            self.output_dir_edit.setText(selected)
+
+    @Slot()
+    def on_output_apply_clicked(self) -> None:
+        if self.manager.is_running():
+            QMessageBox.warning(
+                self,
+                "Scanner Running",
+                "Stop the scan loop before changing the output directory.",
+            )
+            return
+
+        try:
+            new_dir = self.manager.set_output_dir(self.output_dir_edit.text())
+            self.output_dir_edit.setText(str(new_dir))
+
+            if self.manager.is_dry_run():
+                message = (
+                    "Output directory updated for this scanner session.\n\n"
+                    "Dry-run mode will create stub CSV files in this directory.\n\n"
+                    "Because this is dry-run mode, Manual init will not update "
+                    "the real ToS export dialog."
+                )
+            else:
+                message = (
+                    "Output directory updated.\n\n"
+                    "Run Manual init before starting the scan loop so the ToS export "
+                    "dialog uses the new directory."
+                )
+
+            QMessageBox.information(
+                self,
+                "Output Directory Updated",
+                message,
+            )
+
+            # QMessageBox.information(
+            #     self,
+            #     "Output Directory Updated",
+            #     "Output directory updated.\n\n"
+            #     "Run Manual init before starting the scan loop so the ToS export "
+            #     "dialog uses the new directory.",
+            # )
+
+        except Exception as exc:
+            self.logger.exception("UI | Failed to set output directory: %s", exc)
+            QMessageBox.critical(
+                self,
+                "Output Directory Error",
+                str(exc),
+            )
 
     def closeEvent(self, event) -> None:
         if self.manager.is_running() and not self.exit_requested:

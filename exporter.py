@@ -87,6 +87,9 @@ class ToSPseudoWidgetExporter:
         if stop_event is not None and stop_event.is_set():
             raise InterruptedError("Stop requested during export sequence.")
 
+
+
+
     def setup_scan_export_dialog(
         self,
         *,
@@ -97,10 +100,9 @@ class ToSPseudoWidgetExporter:
         """
         One-time setup for the scan export dialog.
 
-        Opens the scan export dialog, normalizes the dialog size to the YAML
-        geometry, sets the export directory, then cancels the dialog.
-
-        Recurring exports should then only enter the filename and save.
+        Opens the scan export dialog, normalizes the dialog size, sets the
+        export directory, saves a small setup CSV to force ToS to persist the
+        directory, verifies the save, then removes the setup CSV.
         """
         self.logger.info("GUI | Begin scan export dialog setup")
         self.logger.info("GUI | Setup export directory: %s", target_dir)
@@ -111,6 +113,18 @@ class ToSPseudoWidgetExporter:
 
         target_dir = Path(target_dir).expanduser().resolve()
         target_dir.mkdir(parents=True, exist_ok=True)
+        setup_path = target_dir / setup_filename
+
+        if setup_path.exists():
+            try:
+                setup_path.unlink()
+                self.logger.info("GUI | Removed stale setup CSV: %s", setup_path)
+            except Exception:
+                self.logger.warning(
+                    "GUI | Could not remove stale setup CSV before setup save: %s",
+                    setup_path,
+                    exc_info=True,
+                )
 
         with self.controller.action_lock:
             self._check_stop(stop_event)
@@ -127,9 +141,81 @@ class ToSPseudoWidgetExporter:
             )
             self._check_stop(stop_event)
 
-            self.controller.cancel_export()
+            self.controller.confirm_save()
+            self._check_stop(stop_event)
+
+            ok = self.controller.verify_save(
+                setup_path.parent,
+                setup_path.name,
+                timeout_s=self.verify_timeout_s,
+                stop_event=stop_event,
+            )
+
+            if not ok:
+                raise TimeoutError(
+                    f"Setup CSV file was not verified within timeout: {setup_path}"
+                )
+
+        try:
+            setup_path.unlink()
+            self.logger.info("GUI | Removed setup CSV after verification: %s", setup_path)
+        except FileNotFoundError:
+            pass
+        except Exception:
+            self.logger.warning(
+                "GUI | Could not remove setup CSV after verification: %s",
+                setup_path,
+                exc_info=True,
+            )
 
         self.logger.info("GUI | Scan export dialog setup complete")
+
+
+
+    # def setup_scan_export_dialog(
+    #     self,
+    #     *,
+    #     target_dir: Path,
+    #     stop_event: Optional[threading.Event] = None,
+    #     setup_filename: str = "__scan_export_setup__.csv",
+    # ) -> None:
+        # """
+        # One-time setup for the scan export dialog.
+
+        # Opens the scan export dialog, normalizes the dialog size to the YAML
+        # geometry, sets the export directory, then cancels the dialog.
+
+        # Recurring exports should then only enter the filename and save.
+        # """
+        # self.logger.info("GUI | Begin scan export dialog setup")
+        # self.logger.info("GUI | Setup export directory: %s", target_dir)
+
+        # if self.dry_run:
+        #     self.logger.info("DRY RUN | scan export dialog setup skipped")
+        #     return
+
+        # target_dir = Path(target_dir).expanduser().resolve()
+        # target_dir.mkdir(parents=True, exist_ok=True)
+
+        # with self.controller.action_lock:
+        #     self._check_stop(stop_event)
+
+        #     self.controller.export_csv_file()
+        #     self._check_stop(stop_event)
+
+        #     self.controller.normalize_scan_export_dialog()
+        #     self._check_stop(stop_event)
+
+        #     self.controller.enter_filename_then_export_directory(
+        #         setup_filename,
+        #         target_dir,
+        #     )
+        #     self._check_stop(stop_event)
+
+        #     self.controller.cancel_export()
+
+        # self.logger.info("GUI | Scan export dialog setup complete")
+
 
     def export_scan(
         self,
@@ -166,6 +252,7 @@ class ToSPseudoWidgetExporter:
                 csv_path.parent,
                 csv_path.name,
                 timeout_s=self.verify_timeout_s,
+                stop_event=stop_event,
             )
 
             if not ok:
