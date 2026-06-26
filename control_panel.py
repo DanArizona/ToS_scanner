@@ -155,6 +155,11 @@ class ScanControlPanel(QWidget):
         self.scan_btn.clicked.connect(self.on_scan_clicked)
         maint_col.addWidget(self.scan_btn)
 
+        self.scan_export_btn = QPushButton("Scan and Export CSV")
+        self.scan_export_btn.clicked.connect(self.on_scan_export_clicked)
+        maint_col.addWidget(self.scan_export_btn)
+
+
         # -------------------- start of output-directory group --------------------
 
         output_group = QGroupBox("Output directory")
@@ -323,10 +328,12 @@ class ScanControlPanel(QWidget):
         self.radio_production.setEnabled(False)
         self.radio_debug.setEnabled(False)
         self.notify_checkbox.setEnabled(False)
-        self.manual_init_btn.setEnabled(False)
 
+        self.manual_init_btn.setEnabled(False)
         self.unlock_scan_btn.setEnabled(False)
         self.scan_btn.setEnabled(False)
+        self.scan_export_btn.setEnabled(False)
+
         self.scan_status_value.setText("Stopped")
 
         self._set_output_dir_controls_enabled(False)
@@ -372,6 +379,7 @@ class ScanControlPanel(QWidget):
             self.manual_init_btn.setEnabled(False)
             self.unlock_scan_btn.setEnabled(False)
             self.scan_btn.setEnabled(False)
+            self.scan_export_btn.setEnabled(False)
             self._set_output_dir_controls_enabled(False)
             return
 
@@ -390,11 +398,18 @@ class ScanControlPanel(QWidget):
             self.start_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
 
-        self.manual_init_btn.setEnabled(not self.exit_requested)
-        self.unlock_scan_btn.setEnabled(not self.exit_requested)
+        # self.manual_init_btn.setEnabled(not self.exit_requested)
+        # self.unlock_scan_btn.setEnabled(not self.exit_requested)
+        # self.scan_btn.setEnabled(not self.exit_requested)
+        # self.exit_btn.setEnabled(True)
+        # self._set_output_dir_controls_enabled(not running and not self.exit_requested)
+
+        self.manual_init_btn.setEnabled(not self.exit_requested and not running)
+        self.unlock_scan_btn.setEnabled(not self.exit_requested and not running)
+        self.scan_export_btn.setEnabled(not self.exit_requested and not running)
+
         self.scan_btn.setEnabled(not self.exit_requested)
         self.exit_btn.setEnabled(True)
-        self._set_output_dir_controls_enabled(not running and not self.exit_requested)
 
     @Slot(int)
     def on_log_level_seen(self, levelno: int) -> None:
@@ -440,6 +455,11 @@ class ScanControlPanel(QWidget):
     @Slot()
     def on_scan_clicked(self) -> None:
         self.manager.request_user_scan()
+
+    @Slot()
+    def on_scan_export_clicked(self) -> None:
+        self.logger.info("UI | Scan and Export CSV requested.")
+        self.manager.scan_and_export_csv()
 
     @Slot()
     def on_start_clicked(self) -> None:

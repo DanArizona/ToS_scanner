@@ -298,6 +298,30 @@ class ScanControlManager:
         )
         thread.start()
 
+
+    def scan_and_export_csv(self) -> None:
+        if self.is_running():
+            self.logger.warning(
+                "UI | Scan and Export CSV ignored because scan loop is active. "
+                "Stop the loop first."
+            )
+            return
+
+        thread = threading.Thread(
+            target=self._run_maintenance_action,
+            args=(
+                "scan_and_export_csv",
+                lambda exporter: exporter.scan_and_export_now(
+                    output_dir=self.output_dir,
+                    stop_event=None,
+                ),
+            ),
+            daemon=True,
+            name="ManualScanExport",
+        )
+        thread.start()
+
+
     def start(self, *, gate_active: bool) -> None:
         if self.is_running():
             self.logger.info("UI | Start ignored because runner is already active.")
