@@ -20,7 +20,6 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
-    # QComboBox,
     QFrame,
     QFileDialog,
     QGridLayout,
@@ -32,7 +31,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
-    # QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -74,8 +72,17 @@ class ScanControlPanel(QWidget):
 
         self.escape_bridge = EscapeBridge()
         self.escape_bridge.escape_pressed.connect(self.on_escape_pressed)
-        self.escape_listener = keyboard.Listener(on_press=self._on_key_press)
-        self.escape_listener.start()
+        self.escape_bridge.scan_export_pressed.connect(self.on_scan_export_hotkey)
+        self.escape_bridge.exit_pressed.connect(self.on_exit_hotkey)
+
+        self.hotkey_listener = keyboard.GlobalHotKeys(
+            {
+                "<esc>": self._emit_escape_hotkey,
+                "<ctrl>+<alt>+e": self._emit_scan_export_hotkey,
+                "<ctrl>+<alt>+q": self._emit_exit_hotkey,
+            }
+        )
+        self.hotkey_listener.start()
 
         self.setWindowTitle("JTM Scan Manager")
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
@@ -227,7 +234,8 @@ class ScanControlPanel(QWidget):
         self.stop_btn.clicked.connect(self.on_stop_clicked)
         control_row.addWidget(self.stop_btn)
 
-        esc_note = QLabel("ESC also requests\n a graceful stop")
+        # esc_note = QLabel("ESC also requests\n a graceful stop")
+        esc_note = QLabel("ESC Stop\nCtrl+Alt+E Export\nCtrl+Alt+Q Exit")
         esc_note.setAlignment(Qt.AlignmentFlag.AlignCenter)
         control_row.addWidget(esc_note)
 
@@ -312,9 +320,14 @@ class ScanControlPanel(QWidget):
             """
         )
 
-    def _on_key_press(self, key) -> None:
-        if key == keyboard.Key.esc:
-            self.escape_bridge.escape_pressed.emit()
+    def _emit_escape_hotkey(self) -> None:
+        self.escape_bridge.escape_pressed.emit()
+
+    def _emit_scan_export_hotkey(self) -> None:
+        self.escape_bridge.scan_export_pressed.emit()
+
+    def _emit_exit_hotkey(self) -> None:
+        self.escape_bridge.exit_pressed.emit()
 
     def _refresh_counters(self) -> None:
         self.warning_value.setText(str(self.warning_count))
@@ -398,12 +411,6 @@ class ScanControlPanel(QWidget):
             self.start_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
 
-        # self.manual_init_btn.setEnabled(not self.exit_requested)
-        # self.unlock_scan_btn.setEnabled(not self.exit_requested)
-        # self.scan_btn.setEnabled(not self.exit_requested)
-        # self.exit_btn.setEnabled(True)
-        # self._set_output_dir_controls_enabled(not running and not self.exit_requested)
-
         self.manual_init_btn.setEnabled(not self.exit_requested and not running)
         self.unlock_scan_btn.setEnabled(not self.exit_requested and not running)
         self.scan_export_btn.setEnabled(not self.exit_requested and not running)
@@ -419,15 +426,6 @@ class ScanControlPanel(QWidget):
             self.warning_count += 1
 
         self._refresh_counters()
-
-    # @Slot()
-    # def on_mode_changed(self) -> None:
-    #     if self.manager.is_running():
-    #         return
-
-    #     mode_name = "Production" if self._production_mode() else "Debug"
-    #     self.logger.info("UI | Mode changed to %s", mode_name)
-    #     self.refresh_dynamic_state()
 
     @Slot(bool)
     def on_mode_changed(self, checked: bool) -> None:
@@ -486,6 +484,19 @@ class ScanControlPanel(QWidget):
             self.logger.info("ESC | Stop requested by Escape key.")
             self.manager.stop()
             self.refresh_dynamic_state()
+
+    @Slot()
+    def on_scan_export_hotkey(self) -> None:
+        self.logger.info("HOTKEY | Ctrl+Alt+E requested Scan and Export CSV.")
+        self.manager.scan_and_export_csv()
+        self.refresh_dynamic_state()
+
+    @Slot()
+    def on_exit_hotkey(self) -> None:
+        self.logger.info("HOTKEY | Ctrl+Alt+Q requested Exit Scan Manager.")
+        self.on_exit_clicked()
+
+
 
     @Slot()
     def on_exit_clicked(self) -> None:
@@ -566,14 +577,6 @@ class ScanControlPanel(QWidget):
                 message,
             )
 
-            # QMessageBox.information(
-            #     self,
-            #     "Output Directory Updated",
-            #     "Output directory updated.\n\n"
-            #     "Run Manual init before starting the scan loop so the ToS export "
-            #     "dialog uses the new directory.",
-            # )
-
         except Exception as exc:
             self.logger.exception("UI | Failed to set output directory: %s", exc)
             QMessageBox.critical(
@@ -597,7 +600,8 @@ class ScanControlPanel(QWidget):
             pass
 
         try:
-            self.escape_listener.stop()
+            # self.escape_listener.stop()
+            self.hotkey_listener.stop()
         except Exception:
             pass
 
