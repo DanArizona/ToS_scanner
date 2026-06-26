@@ -17,10 +17,12 @@ class ManagerBridge(QObject):
     status_changed = Signal(str)
     running_changed = Signal(bool)
 
-
+# class EscapeBridge(QObject):
+#     escape_pressed = Signal()
 class EscapeBridge(QObject):
     escape_pressed = Signal()
-
+    scan_export_pressed = Signal()
+    exit_pressed = Signal()
 
 class GuiLogBridge(QObject):
     log_level_seen = Signal(int)
