@@ -108,6 +108,10 @@ class ToSActionsController:
         self._log("GUI | widget center resolved -> %s @ (%d, %d)", name, x, y)
         return x, y
 
+    def _get_named_window(self, widget_name: str):
+        title_prefix = self.cfg.title_map[widget_name]
+        return self._get_matching_window(title_prefix)
+
     def _get_matching_window(self, title_prefix: str):
         normalized_prefix = title_prefix.strip()
 
@@ -119,8 +123,12 @@ class ToSActionsController:
         return None
 
     def _bring_named_window_to_front(self, widget_name: str) -> None:
+        # title_prefix = self.cfg.title_map[widget_name]
+        # win = self._get_matching_window(title_prefix)
         title_prefix = self.cfg.title_map[widget_name]
-        win = self._get_matching_window(title_prefix)
+        win = self._get_named_window(widget_name)
+
+
         if win is None:
             raise RuntimeError(
                 f"Could not find window for {widget_name!r} with prefix {title_prefix!r}"
@@ -264,24 +272,6 @@ class ToSActionsController:
         self._move_vh(cancel_button_widget)
         self._click()
 
-    # def _widget_size(self, widget_name: str) -> tuple[int, int]:
-    #     """
-    #     Return expected widget/window size from the loaded YAML layout.
-    #     """
-    #     widget = self._widget(widget_name)
-
-    #     # Most likely case for your current models.
-    #     if hasattr(widget, "width") and hasattr(widget, "height"):
-    #         return int(widget.width), int(widget.height)
-
-    #     # Fallback if the dimensions live on a nested region/bbox object.
-    #     for attr_name in ("region", "bbox"):
-    #         region = getattr(widget, attr_name, None)
-    #         if region is not None and hasattr(region, "width") and hasattr(region, "height"):
-    #             return int(region.width), int(region.height)
-
-    #     raise RuntimeError(f"Could not determine expected size for widget {widget_name!r}")
-    
 
     def _widget_size(self, widget_name: str) -> tuple[int, int]:
         """
@@ -333,8 +323,10 @@ class ToSActionsController:
         #     raise RuntimeError(f"{window_name} is not open; cannot check size.")
 
 
+        # if win is None:
+        #     win = self._get_matching_window(window_name)
         if win is None:
-            win = self._get_matching_window(window_name)
+            win = self._get_named_window(window_name)
 
         if win is None:
             raise RuntimeError(f"{window_name} is not open; cannot check size.")
@@ -401,53 +393,15 @@ class ToSActionsController:
             if not self._wait_for_window(window_name, timeout_s=3.0):
                 raise RuntimeError(f"{window_name} is not open after resize.")
 
-            win = self._get_matching_window(window_name)
+            # win = self._get_matching_window(window_name)
+            # if win is None:
+            #     raise RuntimeError(f"{window_name} could not be re-fetched after resize.")
+            win = self._get_named_window(window_name)
             if win is None:
                 raise RuntimeError(f"{window_name} could not be re-fetched after resize.")
 
             self._assert_window_size(window_name, win=win)
 
-
-            # resize_to(expected_w, expected_h)
-            # self._sleep(1.0)
-
-            # # Re-fetch after resize because some window objects may not refresh
-            # # width/height properties immediately.
-            # win = self._get_matching_window(window_name)
-            # if win is None:
-            #     raise RuntimeError(f"{window_name} is not open after resize.")
-
-            # self._assert_window_size(window_name, win=win)
-
-
-    # def normalize_window_size(self, window_name: str) -> None:
-    #     """
-    #     Resize an open ToS window/dialog to the YAML root size, then verify it.
-
-    #     Intended for setup/initialization workflows, not for every recurring
-    #     export action.
-    #     """
-    #     with self.action_lock:
-    #         win = self._bring_named_window_to_front(window_name)
-
-    #         expected_w, expected_h = self._widget_size(window_name)
-
-    #         self._log(
-    #             "GUI | normalize window size -> %s expected=%sx%s actual=%sx%s",
-    #             window_name,
-    #             expected_w,
-    #             expected_h,
-    #             int(win.width),
-    #             int(win.height),
-    #         )
-
-    #         win.resizeTo(expected_w, expected_h)
-    #         self._sleep(1.0)
-
-    #         # Re-fetch after resize because some window objects may not refresh
-    #         # width/height properties immediately.
-    #         win = self._get_matching_window(window_name)
-    #         self._assert_window_size(window_name, win=win)
 
     def normalize_scan_export_dialog(self) -> None:
         self.normalize_window_size("win_export")

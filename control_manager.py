@@ -127,7 +127,7 @@ class ScanControlManager:
         return "imminent_export", seconds_until, paused
 
     def request_user_scan(self) -> None:
-        self.logger.info("UI | Scan button clicked.")
+        self.logger.info("UI | Press ToS Scan button clicked.")
 
         decision, seconds_until, paused = self._classify_user_scan_request()
 
@@ -201,7 +201,8 @@ class ScanControlManager:
 
         try:
             exporter = self._ensure_exporter()
-            fn(exporter.controller)
+            # fn(exporter.controller)
+            fn(exporter)
 
         except Exception:
             self.logger.exception("UI | Maintenance action failed: %s", label)
@@ -220,7 +221,14 @@ class ScanControlManager:
 
         thread = threading.Thread(
             target=self._run_maintenance_action,
-            args=("manual_init", lambda ctl: ctl.manual_init()),
+            # args=("manual_init", lambda ctl: ctl.manual_init()),
+            args=(
+                "manual_init",
+                lambda exporter: exporter.setup_scan_export_dialog(
+                    target_dir=self.output_dir,
+                    stop_event=self.stop_event,
+                ),
+            ),
             daemon=True,
             name="ManualInit",
         )
@@ -233,8 +241,11 @@ class ScanControlManager:
             )
             return
 
-        def _do_unlock(ctl):
-            unlocked = ctl.unlock_scan()
+        # def _do_unlock(ctl):
+        #     unlocked = ctl.unlock_scan()
+        #     self.logger.info("UI | Unlock scan result unlocked=%s", unlocked)
+        def _do_unlock(exporter):
+            unlocked = exporter.controller.unlock_scan()
             self.logger.info("UI | Unlock scan result unlocked=%s", unlocked)
 
         thread = threading.Thread(

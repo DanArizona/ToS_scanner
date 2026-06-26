@@ -87,6 +87,50 @@ class ToSPseudoWidgetExporter:
         if stop_event is not None and stop_event.is_set():
             raise InterruptedError("Stop requested during export sequence.")
 
+    def setup_scan_export_dialog(
+        self,
+        *,
+        target_dir: Path,
+        stop_event: Optional[threading.Event] = None,
+        setup_filename: str = "__scan_export_setup__.csv",
+    ) -> None:
+        """
+        One-time setup for the scan export dialog.
+
+        Opens the scan export dialog, normalizes the dialog size to the YAML
+        geometry, sets the export directory, then cancels the dialog.
+
+        Recurring exports should then only enter the filename and save.
+        """
+        self.logger.info("GUI | Begin scan export dialog setup")
+        self.logger.info("GUI | Setup export directory: %s", target_dir)
+
+        if self.dry_run:
+            self.logger.info("DRY RUN | scan export dialog setup skipped")
+            return
+
+        target_dir = Path(target_dir).expanduser().resolve()
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        with self.controller.action_lock:
+            self._check_stop(stop_event)
+
+            self.controller.export_csv_file()
+            self._check_stop(stop_event)
+
+            self.controller.normalize_scan_export_dialog()
+            self._check_stop(stop_event)
+
+            self.controller.enter_filename_then_export_directory(
+                setup_filename,
+                target_dir,
+            )
+            self._check_stop(stop_event)
+
+            self.controller.cancel_export()
+
+        self.logger.info("GUI | Scan export dialog setup complete")
+
     def export_scan(
         self,
         csv_path: Path,
