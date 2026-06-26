@@ -148,7 +148,7 @@ class ScanControlPanel(QWidget):
         self.unlock_scan_btn.clicked.connect(self.on_unlock_scan_clicked)
         maint_col.addWidget(self.unlock_scan_btn)
 
-        self.scan_btn = QPushButton("Scan")
+        self.scan_btn = QPushButton("Press ToS Scan")
         self.scan_btn.clicked.connect(self.on_scan_clicked)
         maint_col.addWidget(self.scan_btn)
 
