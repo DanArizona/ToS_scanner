@@ -44,3 +44,7 @@ secure/
 *.ecfg
 *.odp*
 *diagnostic*.txt
+*.pyc
+
+docs/archive/
+docs/dev_notes/
