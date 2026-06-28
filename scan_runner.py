@@ -22,6 +22,7 @@ from scan_control_state import (
     wait_until_dynamic,
     wait_while_paused,
 )
+from scan_artifacts import ScanArtifactSpec
 
 from scheduler import ET, SchedulerFlags, next_slot_after
 
@@ -67,7 +68,7 @@ class ScanRunner:
             paused, pause_generation = self.pause_ctl.snapshot()
 
             slot_et = next_slot_after(now_et, gate_active)
-            csv_path = self.output_dir / f"scan-{slot_et:%Y-%m-%d-%H-%M-%S}-ToS.csv"
+            csv_path = self.output_dir / ScanArtifactSpec("ToS-scan").filename_for(slot_et)
 
             self.logger.info(
                 "Next slot=%s gate_active=%s paused=%s target_csv=%s",
