@@ -20,7 +20,7 @@ from scheduler import ET
 from config import ScannerConfig
 from layout import load_widget_layout
 from tos_pwidget_actions import ToSActionsController
-from scan_artifacts import ScanArtifactSpec
+from scan_artifacts import SOURCE_TOS_MANUAL, ScanArtifactSpec
 
 
 ET = ZoneInfo("America/New_York")
@@ -241,7 +241,7 @@ class ToSPseudoWidgetExporter:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         now_et = datetime.now(ET)
-        filename = ScanArtifactSpec("ToS-manual").filename_for(now_et)
+        filename = ScanArtifactSpec(SOURCE_TOS_MANUAL).filename_for(now_et)
         csv_path = output_dir / filename
 
         self.logger.info("GUI | Begin manual scan and export")
