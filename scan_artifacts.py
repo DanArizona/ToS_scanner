@@ -7,13 +7,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+SOURCE_TOS_SCAN = "ToS-scan"
+SOURCE_TOS_MANUAL = "ToS-manual"
+SOURCE_WATCHLIST = "Watchlist"
+SOURCE_SCHWAB_API = "Schwab-API"
+SOURCE_MASSIVE_API = "Massive-API"
+
 
 SCAN_SOURCE_CODES: dict[str, str] = {
-    "ToS-scan": "TS",
-    "ToS-manual": "TM",
-    "Watchlist": "WL",
-    "Schwab-API": "SA",
-    "Massive-API": "MA",
+    SOURCE_TOS_SCAN: "TS",
+    SOURCE_TOS_MANUAL: "TM",
+    SOURCE_WATCHLIST: "WL",
+    SOURCE_SCHWAB_API: "SA",
+    SOURCE_MASSIVE_API: "MA",
 }
 
 
