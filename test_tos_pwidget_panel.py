@@ -363,22 +363,6 @@ class ActionsPanel(QWidget):
         )
         thread.start()
 
-    # def expected_action_error_message(self, action_id: int, exc: Exception) -> Optional[str]:
-    #     text = str(exc)
-
-    #     if "Could not find window for 'win_export'" in text:
-    #         return (
-    #             f"Action {action_id} requires the TS export dialog. "
-    #             "Use 7) Open TS Export dialog first, then retry."
-    #         )
-
-    #     if "Could not find window for 'win_wl_export'" in text:
-    #         return (
-    #             f"Action {action_id} requires the WL export dialog. "
-    #             "Use 19) Open WL Export first, then retry."
-    #         )
-
-    #     return None
     def expected_action_error_message(self, action_id: int, exc: Exception) -> Optional[str]:
         text = str(exc)
 
