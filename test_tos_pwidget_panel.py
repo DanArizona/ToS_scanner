@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from config import load_scanner_config
 from tos_pwidget_actions import ToSActionsController
+from scan_artifacts import SOURCE_TOS_SCAN, SOURCE_WATCHLIST, ScanArtifactSpec
 
 
 def setup_logger(log_dir: Path) -> logging.Logger:
@@ -58,19 +59,16 @@ def setup_logger(log_dir: Path) -> logging.Logger:
 
 
 def make_filename() -> str:
-#     return f"scan-{datetime.now():%Y-%m-%d-%H-%M-%S}-ToS.csv"
     return make_scan_filename()
-
-def make_tos_filename(prefix: str) -> str:
-    return datetime.now().strftime(f"{prefix}-%Y-%m-%d-%H-%M-%S-ToS.csv")
 
 
 def make_scan_filename() -> str:
-    return make_tos_filename("scan")
+    return ScanArtifactSpec(SOURCE_TOS_SCAN).filename_for(datetime.now())
 
 
 def make_watchlist_filename() -> str:
-    return make_tos_filename("wlist")
+    return ScanArtifactSpec(SOURCE_WATCHLIST).filename_for(datetime.now())
+
 
 class PanelBridge(QObject):
     action_finished = Signal()
@@ -187,10 +185,6 @@ class ActionsPanel(QWidget):
         self.layout_reload_btn.clicked.connect(self.reload_layout_yaml)
         layout_row.addWidget(self.layout_reload_btn)
 
-        # self.target_dir_label = QLabel(f"Target dir: {self.target_dir}")
-        # self.target_dir_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        # outer.addWidget(self.target_dir_label)
-
         target_row = QHBoxLayout()
         outer.addLayout(target_row)
 
@@ -210,46 +204,49 @@ class ActionsPanel(QWidget):
         self.buttons: list[QPushButton] = []
 
         action_specs = [
-            (1, "1  Open Scan Tab"),
-            (2, "2  Load scan050_data"),
-            (3, "3  Load % Change Gainers"),
-            (4, "4  Trigger Scan"),
-            (5, "5  Export CSV File"),
-            (6, "6  Enter Filename"),
-            (7, "7  Confirm Save"),
-            (8, "8  Cancel Export"),
-            (9, "9  Verify Save"),
-            (10, "10  NOP"),
-            (11, "11  Select WL Default"),
-            (12, "12  Select WL scan50_data"),
-            (13, "13  Open WL Export"),
-            (14, "14 Setup Export Dir"),
-            (15, "15 Enter WL Filename"),
-            (16, "16 Setup WL Export Dir"),
-            (17, "17 Confirm WL Save"),
-            (18, "18 Cancel WL Export"),
-            (19, "19 Verify WL Save"),
-            (20, "20 Replace WL Symbols"),
-            (21, "21 Add WL Symbols"),
-            (22, "22 Normalize Scan Export Dialog"),
-            (23, "23 Normalize WL Export Dialog"),
+            (1, "1) Open Scan Tab"),
+            (2, "2) Load scan050_data"),
+            (3, "3) Load % Change Gainers"),
+            (4, "4) Trigger TS Scan"),
+
+            (5, "5) Normalize TS Export Dialog"),
+            (6, "6) Set TS Export Dir"),
+            (7, "7) Open TS Export dialog"),
+            (8, "8) Enter TS filename"),
+
+            (9, "9) Confirm TS Save"),
+            (10, "10) Cancel TS Export"),
+            (11, "11) Verify TS Save"),
+            (12, "12) Complete TS Save"),
+
+            (13, "13) Select WL Default"),
+            (14, "14) Select WL scan50_data"),
+            (15, "15) Replace symbols"),
+            (16, "16) Add symbols"),
+
+            (17, "17) Normalize WL Export Dialog"),
+            (18, "18) Set WL Export Dir"),
+            (19, "19) Open WL Export"),
+            (20, "20) Enter WL filename"),
+
+            (21, "21) Confirm WL Save"),
+            (22, "22) Cancel WL Export"),
+            (23, "23) Verify WL Save"),
+            (24, "24) Complete WL Save"),
         ]
 
+
         for idx, (action_id, text) in enumerate(action_specs):
-            row = idx // 2
-            col = idx % 2
+            row = idx // 4
+            col = idx % 4
             btn = QPushButton(text)
+            btn.setMinimumWidth(180)
             btn.clicked.connect(lambda checked=False, aid=action_id: self.start_action(aid))
             grid.addWidget(btn, row, col)
             self.buttons.append(btn)
 
         bottom = QHBoxLayout()
         outer.addLayout(bottom)
-
-        # self.sequence_btn = QPushButton("Export → Enter Pathname → Confirm Save → Verify Save")
-        self.sequence_btn = QPushButton("Complete Save Sequence")
-        self.sequence_btn.clicked.connect(self.start_export_sequence)
-        bottom.addWidget(self.sequence_btn)
 
         self.quit_btn = QPushButton("Quit")
         self.quit_btn.clicked.connect(self.close)
@@ -265,7 +262,6 @@ class ActionsPanel(QWidget):
         self.status_label.setText(text)
         for btn in self.buttons:
             btn.setEnabled(not busy)
-        self.sequence_btn.setEnabled(not busy)
 
     def append_log_line(self, text: str) -> None:
         self.log_view.append(text)
@@ -367,6 +363,51 @@ class ActionsPanel(QWidget):
         )
         thread.start()
 
+    # def expected_action_error_message(self, action_id: int, exc: Exception) -> Optional[str]:
+    #     text = str(exc)
+
+    #     if "Could not find window for 'win_export'" in text:
+    #         return (
+    #             f"Action {action_id} requires the TS export dialog. "
+    #             "Use 7) Open TS Export dialog first, then retry."
+    #         )
+
+    #     if "Could not find window for 'win_wl_export'" in text:
+    #         return (
+    #             f"Action {action_id} requires the WL export dialog. "
+    #             "Use 19) Open WL Export first, then retry."
+    #         )
+
+    #     return None
+    def expected_action_error_message(self, action_id: int, exc: Exception) -> Optional[str]:
+        text = str(exc)
+
+        if "Could not find window for 'win_export'" in text:
+            return (
+                f"Action {action_id} requires the TS export dialog. "
+                "Use 7) Open TS Export dialog first, then retry."
+            )
+
+        if "Could not find window for 'win_wl_export'" in text:
+            return (
+                f"Action {action_id} requires the WL export dialog. "
+                "Use 19) Open WL Export first, then retry."
+            )
+
+        if "Could not find window for 'win_wl_main'" in text:
+            return (
+                f"Action {action_id} requires the Watchlist main window. "
+                "Open or bring the Watchlist window to the front, then retry."
+            )
+
+        if "Could not find window for 'win_wl_symbols_import'" in text:
+            return (
+                f"Action {action_id} requires the Symbols Import dialog. "
+                "Retry the watchlist symbol action, or open the import dialog first."
+            )
+
+        return None
+
     def execute_action(self, action_id: int) -> None:
         try:
             self.logger.info("ACTION | begin %s", action_id)
@@ -384,55 +425,9 @@ class ActionsPanel(QWidget):
                 self.controller.trigger_scan()
 
             elif action_id == 5:
-                self.controller.export_csv_file()
+                self.controller.normalize_scan_export_dialog()
 
             elif action_id == 6:
-                target_dir = self.current_target_dir()
-
-                self.current_filename = make_scan_filename()
-
-                self.logger.info("ACTION | current filename set to %s", self.current_filename)
-                self.bridge.filename_changed.emit(self.current_filename)
-
-                self.controller.enter_filename(self.current_filename, target_dir)
-
-            elif action_id == 7:
-                self.controller.confirm_save()
-
-            elif action_id == 8:
-                self.controller.cancel_export()
-
-            elif action_id == 9:
-                filename = self.current_filename
-                if not filename:
-                    raise RuntimeError("No current CSV filename to verify.")
-
-                ok = self.controller.verify_save(self.current_target_dir(), filename)
-
-                if ok:
-                    self.status_label.setText("Save verified")
-                else:
-                    self.status_label.setText("Save not verified")
-
-                self.logger.info(
-                    "VERIFY | filename=%s result=%s",
-                    self.current_filename,
-                    ok,
-                )
-
-            elif action_id == 10:
-                self.controller.nop()
-
-            elif action_id == 11:
-                self.controller.select_watchlist_default()
-
-            elif action_id == 12:
-                self.controller.select_watchlist_scan50_data()
-
-            elif action_id == 13:
-                self.controller.open_watchlist_export()
-
-            elif action_id == 14:
                 target_dir = self.current_target_dir()
 
                 self.current_filename = make_scan_filename()
@@ -445,16 +440,75 @@ class ActionsPanel(QWidget):
                     target_dir,
                 )
 
-            elif action_id == 15:
+            elif action_id == 7:
+                self.controller.export_csv_file()
+
+            elif action_id == 8:
                 target_dir = self.current_target_dir()
 
-                self.current_filename = make_watchlist_filename()
+                self.current_filename = make_scan_filename()
                 self.logger.info("ACTION | current filename set to %s", self.current_filename)
                 self.bridge.filename_changed.emit(self.current_filename)
 
-                self.controller.enter_watchlist_filename(self.current_filename, target_dir)
+                self.controller.enter_filename(self.current_filename, target_dir)
+
+            elif action_id == 9:
+                self.controller.confirm_save()
+
+            elif action_id == 10:
+                self.controller.cancel_export()
+
+            elif action_id == 11:
+                filename = self.current_filename
+                if not filename:
+                    raise RuntimeError("No current TS CSV filename to verify.")
+
+                ok = self.controller.verify_save(self.current_target_dir(), filename)
+
+                if ok:
+                    self.status_label.setText("TS save verified")
+                else:
+                    self.status_label.setText("TS save not verified")
+
+                self.logger.info(
+                    "VERIFY | TS filename=%s result=%s",
+                    filename,
+                    ok,
+                )
+
+            elif action_id == 12:
+                self.execute_export_sequence()
+
+            elif action_id == 13:
+                self.controller.select_watchlist_default()
+
+            elif action_id == 14:
+                self.controller.select_watchlist_scan50_data()
+
+            elif action_id == 15:
+                symbols = self.current_symbol_text()
+                if not symbols:
+                    raise RuntimeError(
+                        "No watchlist symbols provided. Refusing to continue because "
+                        "ToS can lock up if the clipboard is empty."
+                    )
+
+                self.controller.replace_watchlist_symbols(symbols)
 
             elif action_id == 16:
+                symbols = self.current_symbol_text()
+                if not symbols:
+                    raise RuntimeError(
+                        "No watchlist symbols provided. Refusing to continue because "
+                        "ToS can lock up if the clipboard is empty."
+                    )
+
+                self.controller.add_watchlist_symbols(symbols)
+
+            elif action_id == 17:
+                self.controller.normalize_watchlist_export_dialog()
+
+            elif action_id == 18:
                 target_dir = self.current_target_dir()
 
                 self.current_filename = make_watchlist_filename()
@@ -467,13 +521,25 @@ class ActionsPanel(QWidget):
                     target_dir,
                 )
 
-            elif action_id == 17:
+            elif action_id == 19:
+                self.controller.open_watchlist_export()
+
+            elif action_id == 20:
+                target_dir = self.current_target_dir()
+
+                self.current_filename = make_watchlist_filename()
+                self.logger.info("ACTION | current filename set to %s", self.current_filename)
+                self.bridge.filename_changed.emit(self.current_filename)
+
+                self.controller.enter_watchlist_filename(self.current_filename, target_dir)
+
+            elif action_id == 21:
                 self.controller.confirm_watchlist_save()
 
-            elif action_id == 18:
+            elif action_id == 22:
                 self.controller.cancel_watchlist_export()
 
-            elif action_id == 19:
+            elif action_id == 23:
                 filename = self.current_filename
                 if not filename:
                     raise RuntimeError("No current watchlist filename to verify.")
@@ -491,61 +557,32 @@ class ActionsPanel(QWidget):
                     ok,
                 )
 
-            elif action_id == 20:
-                symbols = self.current_symbol_text()
-                if not symbols:
-                    raise RuntimeError(
-                        "No watchlist symbols provided. Refusing to continue because "
-                        "ToS can lock up if the clipboard is empty."
-                    )
-
-                self.controller.replace_watchlist_symbols(symbols)
-
-            elif action_id == 21:
-                symbols = self.current_symbol_text()
-                if not symbols:
-                    raise RuntimeError(
-                        "No watchlist symbols provided. Refusing to continue because "
-                        "ToS can lock up if the clipboard is empty."
-                    )
-
-                self.controller.add_watchlist_symbols(symbols)
-
-            elif action_id == 22:
-                self.controller.normalize_scan_export_dialog()
-
-            elif action_id == 23:
-                self.controller.normalize_watchlist_export_dialog()
+            elif action_id == 24:
+                self.execute_watchlist_export_sequence()
 
             else:
                 self.logger.warning("ACTION | unknown action id: %s", action_id)
 
             self.logger.info("ACTION | end %s", action_id)
 
-        except Exception:
-            self.logger.exception("ACTION | failed for action %s", action_id)
+        except Exception as exc:
+            user_message = self.expected_action_error_message(action_id, exc)
+
+            if user_message:
+                self.logger.error("ACTION | %s", user_message)
+                self.status_label.setText(user_message)
+            else:
+                self.logger.exception("ACTION | failed for action %s", action_id)
 
         finally:
             self.bridge.action_finished.emit()
 
-    def start_export_sequence(self) -> None:
-        if self.busy:
-            self.logger.info("PANEL | export sequence ignored because panel is busy")
-            return
-
-        self.set_busy(True, "Running export/save sequence ...")
-        self.logger.info("PANEL | export/save sequence requested")
-
-        thread = threading.Thread(
-            target=self.execute_export_sequence,
-            daemon=True,
-            name="Action-Sequence",
-        )
-        thread.start()
 
     def execute_export_sequence(self) -> None:
         try:
             self.logger.info("SEQUENCE | begin export/save sequence")
+
+            target_dir = self.current_target_dir()
 
             self.controller.export_csv_file()
 
@@ -553,11 +590,11 @@ class ActionsPanel(QWidget):
             self.logger.info("SEQUENCE | current filename set to %s", self.current_filename)
             self.bridge.filename_changed.emit(self.current_filename)
 
-            self.controller.enter_filename(self.current_filename, self.target_dir)
+            self.controller.enter_filename(self.current_filename, target_dir)
             self.controller.confirm_save()
 
             ok = self.controller.verify_save(
-                self.target_dir,
+                target_dir,
                 self.current_filename,
             )
 
@@ -574,9 +611,43 @@ class ActionsPanel(QWidget):
 
         except Exception:
             self.logger.exception("SEQUENCE | failed during export/save sequence")
+            raise
 
-        finally:
-            self.bridge.action_finished.emit()
+    def execute_watchlist_export_sequence(self) -> None:
+        try:
+            self.logger.info("SEQUENCE | begin watchlist export/save sequence")
+
+            target_dir = self.current_target_dir()
+
+            self.controller.open_watchlist_export()
+
+            self.current_filename = make_watchlist_filename()
+            self.logger.info("SEQUENCE | current watchlist filename set to %s", self.current_filename)
+            self.bridge.filename_changed.emit(self.current_filename)
+
+            self.controller.enter_watchlist_filename(self.current_filename, target_dir)
+            self.controller.confirm_watchlist_save()
+
+            ok = self.controller.verify_save(
+                target_dir,
+                self.current_filename,
+            )
+
+            self.logger.info(
+                "SEQUENCE | watchlist verify result filename=%s result=%s",
+                self.current_filename,
+                ok,
+            )
+
+            if not ok:
+                self.logger.warning("SEQUENCE | watchlist save verification failed")
+
+            self.logger.info("SEQUENCE | end watchlist export/save sequence")
+
+        except Exception:
+            self.logger.exception("SEQUENCE | failed during watchlist export/save sequence")
+            raise
+
 
     @Slot()
     def on_action_finished(self) -> None:
