@@ -848,7 +848,7 @@ class ToSActionsController:
             self._move_vh("pick_wl_export")
             self._click()
 
-            if not self._wait_for_window("win_wl_export", timeout_s=2.0):
+            if not self._wait_for_window("win_wl_export", timeout_s=5.0):
                 raise RuntimeError("win_wl_export did not appear after watchlist export path.")
 
             self._log("GUI | win_wl_export detected")
