@@ -7,9 +7,13 @@ import threading
 import time
 import numpy as np
 import subprocess
+import ctypes
+import sys
+from ctypes import wintypes
 
 from pathlib import Path
 from typing import Optional
+from collections.abc import Mapping
 
 import pyautogui
 import pygetwindow as gw
@@ -21,6 +25,98 @@ from models import WidgetStack
 
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.0
+
+
+def _get_native_hwnd(win: object) -> int | None:
+    """
+    Return native Windows HWND from a pygetwindow window object, if available.
+    """
+    hwnd = getattr(win, "_hWnd", None)
+
+    if isinstance(hwnd, int) and hwnd:
+        return hwnd
+
+    return None
+
+
+def _set_hwnd_to_top(hwnd: int) -> bool:
+    """
+    Ask Windows to move this window to the top of the normal Z-order.
+
+    This does not move or resize the window.
+    It also does not make the window permanently topmost.
+    """
+    if sys.platform != "win32":
+        return False
+
+    user32 = ctypes.windll.user32
+
+    SetWindowPos = user32.SetWindowPos
+    SetWindowPos.argtypes = [
+        wintypes.HWND,
+        wintypes.HWND,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_uint,
+    ]
+    SetWindowPos.restype = wintypes.BOOL
+
+    HWND_TOP = 0
+
+    SWP_NOSIZE = 0x0001
+    SWP_NOMOVE = 0x0002
+    SWP_SHOWWINDOW = 0x0040
+
+    flags = SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW
+
+    result = SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, flags)
+    return bool(result)
+
+
+def _pulse_hwnd_topmost(hwnd: int) -> bool:
+    """
+    Temporarily make a window topmost, then immediately make it not-topmost.
+
+    This is more forceful than HWND_TOP, but should not leave the window
+    permanently always-on-top.
+    """
+    if sys.platform != "win32":
+        return False
+
+    user32 = ctypes.windll.user32
+
+    SetWindowPos = user32.SetWindowPos
+    SetWindowPos.argtypes = [
+        wintypes.HWND,
+        wintypes.HWND,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_uint,
+    ]
+    SetWindowPos.restype = wintypes.BOOL
+
+    HWND_TOPMOST = -1
+    HWND_NOTOPMOST = -2
+
+    SWP_NOSIZE = 0x0001
+    SWP_NOMOVE = 0x0002
+    SWP_SHOWWINDOW = 0x0040
+
+    flags = SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW
+
+    ok_topmost = bool(
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags)
+    )
+    ok_notopmost = bool(
+        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags)
+    )
+
+    return ok_topmost and ok_notopmost
+
 
 class ToSActionsController:
     """
@@ -122,12 +218,10 @@ class ToSActionsController:
 
         return None
 
-    def _bring_named_window_to_front(self, widget_name: str) -> None:
-        # title_prefix = self.cfg.title_map[widget_name]
-        # win = self._get_matching_window(title_prefix)
+
+    def _bring_named_window_to_front(self, widget_name: str) -> Any:
         title_prefix = self.cfg.title_map[widget_name]
         win = self._get_named_window(widget_name)
-
 
         if win is None:
             raise RuntimeError(
@@ -145,10 +239,41 @@ class ToSActionsController:
         except Exception:
             pass
 
-        self._log("GUI | bring window to front: %s -> %s", widget_name, win.title)
+        hwnd = _get_native_hwnd(win)
+
+        if hwnd is not None:
+            try:
+                ok = _set_hwnd_to_top(hwnd)
+                self._log(
+                    "GUI | SetWindowPos HWND_TOP: %s -> %s",
+                    widget_name,
+                    "OK" if ok else "FAILED",
+                )
+
+                pulse_ok = _pulse_hwnd_topmost(hwnd)
+                self._log(
+                    "GUI | SetWindowPos TOPMOST pulse: %s -> %s",
+                    widget_name,
+                    "OK" if pulse_ok else "FAILED",
+                )
+
+            except Exception as exc:
+                self._log(
+                    "GUI | SetWindowPos raise failed: %s -> %s",
+                    widget_name,
+                    exc,
+                )
+
         self._sleep(self.STEP_PAUSE_S)
 
+        self._log("GUI | bring window to front: %s -> %s", widget_name, win.title)
+        self._log_front_status_for_title(
+            label=widget_name,
+            title=win.title,
+        )
+
         return win
+
 
     def _wait_for_window(self, widget_name: str, timeout_s: float = 2.0) -> bool:
         title_prefix = self.cfg.title_map[widget_name]
@@ -159,6 +284,145 @@ class ToSActionsController:
                 return True
             time.sleep(0.05)
         return False
+    
+    def _diag_field_as_str(
+        self,
+        record: Mapping[str, object],
+        key: str,
+        default: str = "",
+    ) -> str:
+        value = record.get(key)
+
+        if value is None:
+            return default
+
+        return str(value)
+
+
+    def _diag_field_as_int_or_none(
+        self,
+        record: Mapping[str, object],
+        key: str,
+    ) -> int | None:
+        value = record.get(key)
+
+        if value is None:
+            return None
+
+        if isinstance(value, int):
+            return value
+
+        if isinstance(value, str):
+            if not value:
+                return None
+
+            return int(value)
+
+        return None
+
+
+    def _log_front_status_for_title(
+        self,
+        *,
+        label: str,
+        title: str,
+    ) -> None:
+        """
+        Diagnostic only.
+
+        After requesting that a window be brought to the front, log whether it
+        appears foreground/frontmost according to mb_tools.window_survey.
+
+        This does not change window state.
+        """
+        try:
+            from mb_tools.window_survey import survey_windows
+        except Exception as exc:
+            self._log(
+                f"GUI | front-status diagnostic unavailable for {label}: {exc}"
+            )
+            return
+
+        try:
+            records = survey_windows(
+                visible_only=True,
+                sort_by_z_order=True,
+            )
+        except Exception as exc:
+            self._log(
+                f"GUI | front-status diagnostic failed for {label}: {exc}"
+            )
+            return
+
+        target: Mapping[str, object] | None = None
+
+        for record in records:
+            record_title = self._diag_field_as_str(record, "title")
+
+            if record_title == title:
+                target = record
+                break
+
+        if target is None:
+            for record in records:
+                record_title = self._diag_field_as_str(record, "title")
+
+                if title and title in record_title:
+                    target = record
+                    break
+
+        foreground: Mapping[str, object] | None = None
+
+        for record in records:
+            if bool(record.get("is_foreground")):
+                foreground = record
+                break
+
+        if target is None:
+            fg_title = (
+                self._diag_field_as_str(foreground, "title")
+                if foreground is not None
+                else "(none)"
+            )
+            self._log(
+                f"GUI | front-status after request: {label} target not found; "
+                f"foreground={fg_title}"
+            )
+            return
+
+        z_order = self._diag_field_as_int_or_none(target, "z_order")
+        cov_count = self._diag_field_as_int_or_none(target, "covered_by_count")
+        is_foreground = bool(target.get("is_foreground"))
+        is_topmost = bool(target.get("is_topmost"))
+        covered_by = self._diag_field_as_str(target, "covered_by")
+
+        fg_title = (
+            self._diag_field_as_str(foreground, "title")
+            if foreground is not None
+            else "(none)"
+        )
+        fg_z = (
+            self._diag_field_as_int_or_none(foreground, "z_order")
+            if foreground is not None
+            else None
+        )
+
+        self._log(
+            "GUI | front-status after request: "
+            f"{label} z={z_order} "
+            f"foreground={'YES' if is_foreground else 'NO'} "
+            f"topmost={'YES' if is_topmost else 'NO'} "
+            f"covered_by_count={cov_count}"
+        )
+
+        self._log(
+            f"GUI | foreground after request: z={fg_z} title={fg_title}"
+        )
+
+        if covered_by:
+            self._log(
+                f"GUI | {label} still covered by: {covered_by}"
+            )
 
     def _enter_filename_in_export_dialog(
         self,
