@@ -12,7 +12,7 @@ import sys
 from ctypes import wintypes
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from collections.abc import Mapping
 
 import pyautogui
@@ -816,7 +816,7 @@ class ToSActionsController:
             self._move_hv("pick_scan_to_file")
             self._click()
 
-            if not self._wait_for_window("win_export", timeout_s=2.0):
+            if not self._wait_for_window("win_export", timeout_s=3.0):
                 raise RuntimeError("win_export did not appear after export path.")
 
             self._log("GUI | win_export detected")
@@ -888,7 +888,7 @@ class ToSActionsController:
         self,
         target_dir: str | Path,
         filename: str,
-        timeout_s: float = 5.0,
+        timeout_s: float = 3.0,
         stable_window_s: float = 0.4,
         poll_s: float = 0.1,
         stop_event=None,
@@ -927,42 +927,6 @@ class ToSActionsController:
             self._log("VERIFY | save not confirmed within timeout: %s", path)
             return False
 
-    # def verify_save(
-    #     self,
-    #     target_dir: str | Path,
-    #     filename: str,
-    #     timeout_s: float = 5.0,
-    #     stable_window_s: float = 0.4,
-    #     poll_s: float = 0.1,
-    # ) -> bool:
-    #     """
-    #     Verify that the file exists and its size has stabilized.
-    #     """
-    #     with self.action_lock:
-    #         path = Path(target_dir) / filename
-    #         self._log("ACTION | verify_save -> %s", path)
-
-    #         deadline = time.monotonic() + timeout_s
-    #         last_size: Optional[int] = None
-    #         stable_since: Optional[float] = None
-
-    #         while time.monotonic() < deadline:
-    #             if path.exists():
-    #                 size = path.stat().st_size
-    #                 if last_size == size:
-    #                     if stable_since is None:
-    #                         stable_since = time.monotonic()
-    #                     elif time.monotonic() - stable_since >= stable_window_s:
-    #                         self._log("VERIFY | save complete: %s size=%d", path, size)
-    #                         return True
-    #                 else:
-    #                     last_size = size
-    #                     stable_since = None
-
-    #             time.sleep(poll_s)
-
-    #         self._log("VERIFY | save not confirmed within timeout: %s", path)
-    #         return False
 
     # ------------------------------------------------------------------
     # Watchlist actions
@@ -1112,7 +1076,7 @@ class ToSActionsController:
             self._move_vh("pick_wl_export")
             self._click()
 
-            if not self._wait_for_window("win_wl_export", timeout_s=5.0):
+            if not self._wait_for_window("win_wl_export", timeout_s=3.0):
                 raise RuntimeError("win_wl_export did not appear after watchlist export path.")
 
             self._log("GUI | win_wl_export detected")
