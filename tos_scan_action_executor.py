@@ -42,30 +42,13 @@ class ToSExportController(Protocol):
         ...
 
 
-# class WatchlistExportController(Protocol):
-#     def open_watchlist_export(self) -> None:
-#         ...
-
-#     def normalize_watchlist_export_dialog(self) -> None:
-#         ...
-
-#     def enter_watchlist_filename_then_export_directory(
-#         self,
-#         filename: str,
-#         target_dir: str | Path,
-#     ) -> None:
-#         ...
-
-#     def confirm_watchlist_save(self) -> None:
-#         ...
-
-
 class ToSScanActionExecutor(NoOpScanActionExecutor):
     """
     ToS-backed executor for v2 scan jobs.
 
-    First integration target:
+    Currently wired:
         EXPORT_WL -> real ThinkOrSwim watchlist export
+        EXPORT_TS -> real ThinkOrSwim scanner export
 
     Other methods intentionally inherit no-op behavior until they are wired
     one at a time.
