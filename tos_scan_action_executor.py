@@ -38,6 +38,13 @@ class ToSExportController(Protocol):
     def enter_filename(self, filename: str, target_dir: str | Path) -> None:
         ...
 
+    def enter_filename_then_export_directory(
+        self,
+        filename: str,
+        target_dir: str | Path,
+    ) -> None:
+        ...
+
     def confirm_save(self) -> None:
         ...
 
@@ -265,7 +272,7 @@ class ToSScanActionExecutor(NoOpScanActionExecutor):
 
         controller.export_csv_file()
         controller.normalize_scan_export_dialog()
-        controller.enter_filename(
+        controller.enter_filename_then_export_directory(
             filename,
             target_dir,
         )
