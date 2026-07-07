@@ -60,16 +60,14 @@ def main() -> None:
         logger=logger,
     )
 
-    logger.info("Manual test warm-up: bringing Watchlist window to front.")
-    controller._bring_named_window_to_front("win_wl_main")
-    time.sleep(1.0)
-
     input(
         "\nManual test setup:\n"
-        "  1. Confirm the Watchlist window is visible.\n"
-        "  2. Move VS Code, File Explorer, browser, and other windows so they do NOT cover it.\n"
-        "  3. Leave the Watchlist window in its expected position.\n"
-        "  4. Then press Enter here to start watching incoming commands.\n\n"
+        "  1. Confirm the Main scanner window and Watchlist window are both open.\n"
+        "  2. Leave both ToS windows in their expected positions.\n"
+        "  3. It is okay if File Explorer, VS Code, or the browser is in front;\n"
+        "     each export action will surface its target ToS window when needed.\n"
+        "  4. Drop JSON command files into the incoming folder after the loop starts.\n"
+        "  5. Then press Enter here to start watching incoming commands.\n\n"
         "Press Enter when ready..."
     )
 
