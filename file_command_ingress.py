@@ -88,10 +88,23 @@ class FileCommandIngress:
         command_files = sorted(self.incoming_dir.glob("*.json"))
 
         for incoming_path in command_files[:max_files]:
-            processing_path: Path | None = None
-
             try:
                 processing_path = self._move_to_processing(incoming_path)
+
+            except PermissionError as exc:
+                self._log_info(
+                    "Command file temporarily unavailable; "
+                    "will retry on a later poll: %s (%s)",
+                    incoming_path.name,
+                    exc,
+                )
+                continue
+
+            except FileNotFoundError:
+                # Another process may have moved the file after the directory scan.
+                continue
+
+            try:
                 request = self._parse_command_file(processing_path)
 
                 job_queue.submit(request)
@@ -112,10 +125,8 @@ class FileCommandIngress:
                     exc,
                 )
 
-                if processing_path is not None and processing_path.exists():
+                if processing_path.exists():
                     self._move_to_failed(processing_path, exc)
-                elif incoming_path.exists():
-                    self._move_to_failed(incoming_path, exc)
 
         return accepted_count
 
