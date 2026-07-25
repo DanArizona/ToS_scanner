@@ -13,6 +13,12 @@ from scan_output import build_output_path
 
 
 class ToSExportController(Protocol):
+    def replace_watchlist_symbols(self, symbols: str) -> None:
+        ...
+
+    def add_watchlist_symbols(self, symbols: str) -> None:
+        ...
+
     def open_watchlist_export(self) -> None:
         ...
 
@@ -54,12 +60,11 @@ class ToSScanActionExecutor(NoOpScanActionExecutor):
     ToS-backed executor for v2 scan jobs.
 
     Currently wired:
+        REPLACE_WL_SYMBOLS -> real ThinkOrSwim clipboard import
+        ADD_WL_SYMBOLS -> real ThinkOrSwim clipboard import
         EXPORT_WL -> real ThinkOrSwim watchlist export
         EXPORT_TS -> real ThinkOrSwim scanner export
         EXPORT_TM -> real ThinkOrSwim scanner export, TM filename/source
-
-    Other methods intentionally inherit no-op behavior until they are wired
-    one at a time.
     """
 
     def __init__(
@@ -85,6 +90,131 @@ class ToSScanActionExecutor(NoOpScanActionExecutor):
             time.sleep(0.25)
 
         return False
+
+    def replace_wl_symbols(self, request: JobRequest) -> JobResult:
+        """
+        Replace the Default ThinkOrSwim watchlist using clipboard import.
+        """
+        return self._apply_wl_symbol_change(request, mode="replace")
+
+    def add_wl_symbols(self, request: JobRequest) -> JobResult:
+        """
+        Add symbols to the Default ThinkOrSwim watchlist using clipboard import.
+        """
+        return self._apply_wl_symbol_change(request, mode="add")
+
+    def _apply_wl_symbol_change(
+        self,
+        request: JobRequest,
+        *,
+        mode: str,
+    ) -> JobResult:
+        if mode not in {"replace", "add"}:
+            raise ValueError(f"Unsupported watchlist symbol mode: {mode!r}")
+
+        try:
+            symbols = self._symbols_from_request(request)
+            symbol_text = "\n".join(symbols)
+            symbol_count = len(symbols)
+            symbol_word = "symbol" if symbol_count == 1 else "symbols"
+
+            if self.dry_run:
+                if mode == "replace":
+                    message = (
+                        f"DRY RUN: would replace Default WL with "
+                        f"{symbol_count} {symbol_word}."
+                    )
+                else:
+                    message = (
+                        f"DRY RUN: would add {symbol_count} {symbol_word} "
+                        f"to Default WL."
+                    )
+
+                self._log_info(message)
+
+                return JobResult(
+                    request=request,
+                    ok=True,
+                    message=message,
+                )
+
+            if self.action_controller is None:
+                raise RuntimeError("No action_controller was provided.")
+
+            if mode == "replace":
+                self.action_controller.replace_watchlist_symbols(symbol_text)
+            else:
+                self.action_controller.add_watchlist_symbols(symbol_text)
+
+        except Exception as exc:
+            action_label = "Replace" if mode == "replace" else "Add"
+            message = f"{action_label} WL symbols failed: {exc}"
+            self._log_error(message)
+
+            return JobResult(
+                request=request,
+                ok=False,
+                message=message,
+                error=str(exc),
+            )
+
+        if mode == "replace":
+            message = (
+                f"Replaced Default WL with "
+                f"{symbol_count} {symbol_word}."
+            )
+        else:
+            message = (
+                f"Added {symbol_count} {symbol_word} "
+                f"to Default WL."
+            )
+
+        self._log_info(message)
+
+        return JobResult(
+            request=request,
+            ok=True,
+            message=message,
+        )
+
+    def _symbols_from_request(self, request: JobRequest) -> list[str]:
+        """
+        Load, normalize, and de-duplicate symbols from a JobRequest.
+
+        A symbol_file is read by Python and placed on the clipboard; it does
+        not use ThinkOrSwim's file-selection dialog.
+        """
+        raw_values: list[str] = []
+
+        if request.symbol_file is not None:
+            symbol_file = Path(request.symbol_file)
+
+            if not symbol_file.is_file():
+                raise RuntimeError(
+                    f"Watchlist symbol file does not exist: {symbol_file}"
+                )
+
+            raw_values.append(
+                symbol_file.read_text(encoding="utf-8-sig")
+            )
+        else:
+            raw_values.extend(request.symbols)
+
+        symbols: list[str] = []
+        seen: set[str] = set()
+
+        for value in raw_values:
+            for raw_symbol in value.replace(",", " ").split():
+                symbol = raw_symbol.strip().upper()
+
+                if symbol and symbol not in seen:
+                    symbols.append(symbol)
+                    seen.add(symbol)
+
+        if not symbols:
+            raise RuntimeError("No watchlist symbols were provided.")
+
+        return symbols
 
     def export_wl(self, request: JobRequest) -> JobResult:
         """

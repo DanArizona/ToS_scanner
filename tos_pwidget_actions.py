@@ -285,6 +285,22 @@ class ToSActionsController:
             time.sleep(0.05)
         return False
     
+    def _wait_for_window_to_close(
+        self,
+        widget_name: str,
+        timeout_s: float = 5.0,
+    ) -> bool:
+        title_prefix = self.cfg.title_map[widget_name]
+        deadline = time.monotonic() + timeout_s
+
+        while time.monotonic() < deadline:
+            if self._get_matching_window(title_prefix) is None:
+                return True
+
+            time.sleep(0.05)
+
+        return False
+
     def _diag_field_as_str(
         self,
         record: Mapping[str, object],
@@ -972,7 +988,7 @@ class ToSActionsController:
             self._log("ACTION | open_watchlist_symbols_import")
             self._bring_named_window_to_front("win_wl_main")
 
-            self._move_center("btn_wl_actions")
+            self._move_vh("btn_wl_actions")
             self._click()
             self._move_vh("pick_wl_import")
             self._click()
@@ -1001,14 +1017,28 @@ class ToSActionsController:
         self._log("ACTION | apply_watchlist_symbols_from_clipboard -> %s", mode)
         self._bring_named_window_to_front("win_wl_symbols_import")
 
-        self._move_center("rbutt_si_paste")
+        self._move_center(mode_widget)
         self._click()
 
-        self._move_center(mode_widget)
+        self._move_center("rbutt_si_paste")
         self._click()
 
         self._move_vh("btn_si_save")
         self._click()
+
+        if not self._wait_for_window_to_close(
+            "win_wl_symbols_import",
+            timeout_s=5.0,
+        ):
+            raise RuntimeError(
+                "win_wl_symbols_import did not close after accepting "
+                f"the {mode} operation."
+            )
+
+        self._log(
+            "GUI | win_wl_symbols_import closed after %s operation",
+            mode,
+        )
 
     def replace_watchlist_symbols(self, symbols: str) -> None:
         """
@@ -1047,12 +1077,20 @@ class ToSActionsController:
             self._log("ACTION | select_watchlist_default")
             self._bring_named_window_to_front("win_wl_main")
 
-            self._move_center("btn_wl_actions")
+            self._move_vh("btn_wl_actions")
             self._click()
-            self._move_vh("pick_wl_personal")
-            self._click()
+
+            # Hover over Personal to open its submenu.
+            self._move_hv("pick_wl_personal")
+            self._log("GUI | hover submenu -> pick_wl_personal")
+            time.sleep(0.75)
+
+            # Move horizontally into the submenu, then vertically to Default.
             self._move_hv("pick_wl_default")
             self._click()
+
+            # Give ToS time to switch lists before reopening Actions.
+            time.sleep(0.75)
 
     def select_watchlist_scan50_data(self) -> None:
         with self.action_lock:
