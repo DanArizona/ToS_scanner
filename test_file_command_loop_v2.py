@@ -10,9 +10,11 @@ from config import load_scanner_config
 from file_command_ingress import FileCommandIngress
 from scan_dispatcher import ScanDispatcher, ScanRuntimeFlags
 from scan_job_queue import ScanJobQueue
+from scan_jobs import JobKind, JobResult
+from scanner_heartbeat import ScannerHeartbeatPublisher
 from tos_pwidget_actions import ToSActionsController
 from tos_scan_action_executor import ToSScanActionExecutor
-from scan_jobs import JobKind
+
 
 USER_CLEAR_DELAY_S = 2.0
 
@@ -23,6 +25,7 @@ UI_ACTION_JOBS = {
     JobKind.REPLACE_WL_SYMBOLS,
     JobKind.ADD_WL_SYMBOLS,
 }
+
 
 def build_logger() -> logging.Logger:
     logger = logging.getLogger("test_file_command_loop_v2")
@@ -41,7 +44,9 @@ def build_logger() -> logging.Logger:
 def main() -> None:
     logger = build_logger()
 
-    command_root = Path(r"C:\Users\DanLa\Documents\github\stockScans_control")
+    command_root = Path(
+        r"C:\Users\DanLa\Documents\github\stockScans_control"
+    )
 
     ingress = FileCommandIngress(
         command_root=command_root,
@@ -49,8 +54,14 @@ def main() -> None:
     )
 
     job_queue = ScanJobQueue()
-
     flags = ScanRuntimeFlags()
+
+    heartbeat = ScannerHeartbeatPublisher(
+        command_root=command_root,
+        interval_s=5.0,
+    )
+
+    last_result: JobResult | None = None
 
     cfg = load_scanner_config()
 
@@ -58,6 +69,15 @@ def main() -> None:
         layout_path=cfg.pwidget_yaml_path,
         cfg=cfg,
         logger=logger,
+    )
+
+    heartbeat.publish(
+        running=flags.running,
+        paused=flags.paused,
+        shutdown_requested=flags.shutdown_requested,
+        loop_state="waiting_for_operator",
+        last_result=last_result,
+        force=True,
     )
 
     input(
@@ -73,7 +93,7 @@ def main() -> None:
 
     logger.info("Manual test starting in 2 seconds.")
     time.sleep(2.0)
-    
+
     action_executor = ToSScanActionExecutor(
         action_controller=controller,
         output_dir=cfg.scans_path,
@@ -89,15 +109,40 @@ def main() -> None:
 
     logger.info("Starting v2 command loop with real ToS executor.")
     logger.info("Command root: %s", command_root)
-    logger.info("Drop JSON command files into: %s", command_root / "incoming")
+    logger.info(
+        "Drop JSON command files into: %s",
+        command_root / "incoming",
+    )
     logger.info("Use Ctrl+C to exit, or send a stop command.")
+
+    heartbeat.publish(
+        running=flags.running,
+        paused=flags.paused,
+        shutdown_requested=flags.shutdown_requested,
+        loop_state="idle",
+        last_result=last_result,
+        force=True,
+    )
 
     try:
         while not flags.shutdown_requested:
+            loop_state = "paused" if flags.paused else "idle"
+
+            heartbeat.publish(
+                running=flags.running,
+                paused=flags.paused,
+                shutdown_requested=flags.shutdown_requested,
+                loop_state=loop_state,
+                last_result=last_result,
+            )
+
             accepted_count = ingress.add_pending_jobs(job_queue)
 
             if accepted_count:
-                logger.info("Accepted %d command file(s).", accepted_count)
+                logger.info(
+                    "Accepted %d command file(s).",
+                    accepted_count,
+                )
 
             while not job_queue.empty():
                 job = job_queue.get_next(timeout=0)
@@ -105,34 +150,73 @@ def main() -> None:
                 if job is None:
                     break
 
+                heartbeat.publish(
+                    running=flags.running,
+                    paused=flags.paused,
+                    shutdown_requested=flags.shutdown_requested,
+                    loop_state="busy",
+                    current_job=job,
+                    last_result=last_result,
+                    force=True,
+                )
+
                 try:
                     if job.kind in UI_ACTION_JOBS:
                         logger.info(
-                            "Manual test delay: %.1f seconds to clear mouse/keyboard before %s.",
+                            "Manual test delay: %.1f seconds to clear "
+                            "mouse/keyboard before %s.",
                             USER_CLEAR_DELAY_S,
                             job.kind.value,
                         )
                         time.sleep(USER_CLEAR_DELAY_S)
 
                     result = dispatcher.execute(job)
+                    last_result = result
 
                     print()
                     print("JobResult")
                     print("---------")
                     print(f"kind       : {result.request.kind}")
-                    print(f"command_id : {result.request.command_id}")
+                    print(
+                        f"command_id : "
+                        f"{result.request.command_id}"
+                    )
                     print(f"ok         : {result.ok}")
                     print(f"message    : {result.message}")
                     print(f"running    : {flags.running}")
                     print(f"paused     : {flags.paused}")
-                    print(f"shutdown   : {flags.shutdown_requested}")
+                    print(
+                        f"shutdown   : "
+                        f"{flags.shutdown_requested}"
+                    )
                     print()
 
                 finally:
                     job_queue.task_done()
 
+                    if flags.shutdown_requested:
+                        next_loop_state = "stopped"
+                    elif flags.paused:
+                        next_loop_state = "paused"
+                    else:
+                        next_loop_state = "idle"
+
+                    heartbeat.publish(
+                        running=flags.running,
+                        paused=flags.paused,
+                        shutdown_requested=(
+                            flags.shutdown_requested
+                        ),
+                        loop_state=next_loop_state,
+                        current_job=None,
+                        last_result=last_result,
+                        force=True,
+                    )
+
                 if flags.shutdown_requested:
-                    logger.info("Shutdown requested; stopping command loop.")
+                    logger.info(
+                        "Shutdown requested; stopping command loop."
+                    )
                     break
 
             time.sleep(0.5)
@@ -140,9 +224,19 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received; exiting.")
 
+    finally:
+        heartbeat.publish(
+            running=flags.running,
+            paused=flags.paused,
+            shutdown_requested=flags.shutdown_requested,
+            loop_state="stopped",
+            current_job=None,
+            last_result=last_result,
+            force=True,
+        )
+
     logger.info("V2 command loop stopped.")
 
 
 if __name__ == "__main__":
     main()
-
