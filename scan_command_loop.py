@@ -1,4 +1,4 @@
-# test_file_command_loop_v2.py
+# scan_command_loop.py
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ UI_ACTION_JOBS = {
 
 
 def build_logger() -> logging.Logger:
-    logger = logging.getLogger("test_file_command_loop_v2")
+    logger = logging.getLogger("scan_command_loop")
     logger.setLevel(logging.INFO)
 
     if not logger.handlers:
@@ -81,7 +81,7 @@ def main() -> None:
     )
 
     input(
-        "\nManual test setup:\n"
+        "\nScanner command loop setup:\n"
         "  1. Confirm the Main scanner window and Watchlist window are both open.\n"
         "  2. Leave both ToS windows in their expected positions.\n"
         "  3. It is okay if File Explorer, VS Code, or the browser is in front;\n"
@@ -91,7 +91,8 @@ def main() -> None:
         "Press Enter when ready..."
     )
 
-    logger.info("Manual test starting in 2 seconds.")
+    logger.info("Scanner command loop starting in 2 seconds.")
+
     time.sleep(2.0)
 
     action_executor = ToSScanActionExecutor(
@@ -163,8 +164,7 @@ def main() -> None:
                 try:
                     if job.kind in UI_ACTION_JOBS:
                         logger.info(
-                            "Manual test delay: %.1f seconds to clear "
-                            "mouse/keyboard before %s.",
+                            "Operator-clear delay: %.1f seconds before %s.",
                             USER_CLEAR_DELAY_S,
                             job.kind.value,
                         )
