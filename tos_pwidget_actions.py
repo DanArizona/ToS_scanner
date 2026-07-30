@@ -1007,20 +1007,28 @@ class ToSActionsController:
         mode must be either "replace" or "add".
         """
         if mode not in {"replace", "add"}:
-            raise ValueError(f"Unsupported watchlist symbol import mode: {mode!r}")
+            raise ValueError(
+                f"Unsupported watchlist symbol import mode: {mode!r}"
+            )
 
         mode_widget = {
             "replace": "rbutt_si_replace",
             "add": "rbutt_si_add",
         }[mode]
 
-        self._log("ACTION | apply_watchlist_symbols_from_clipboard -> %s", mode)
+        self._log(
+            "ACTION | apply_watchlist_symbols_from_clipboard -> %s",
+            mode,
+        )
         self._bring_named_window_to_front("win_wl_symbols_import")
 
-        self._move_center(mode_widget)
+        # First load the clipboard symbols into the dialog.
+        self._move_center("rbutt_si_paste")
         self._click()
 
-        self._move_center("rbutt_si_paste")
+        # Then select whether the imported symbols replace or augment
+        # the current Watchlist.
+        self._move_center(mode_widget)
         self._click()
 
         self._move_vh("btn_si_save")
