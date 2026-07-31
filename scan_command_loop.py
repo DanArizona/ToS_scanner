@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from pathlib import Path
 
@@ -41,6 +42,91 @@ def build_logger() -> logging.Logger:
     return logger
 
 
+def _wait_for_operator(
+    *,
+    heartbeat: ScannerHeartbeatPublisher,
+    flags: ScanRuntimeFlags,
+    last_result: JobResult | None,
+    refresh_poll_s: float = 0.5,
+) -> None:
+    """
+    Wait for the operator while keeping the waiting heartbeat current.
+
+    refresh_poll_s controls how often the publisher is called. The
+    publisher itself still rate-limits disk writes using interval_s.
+    """
+    stop_event = threading.Event()
+
+    heartbeat.publish(
+        running=flags.running,
+        paused=flags.paused,
+        shutdown_requested=flags.shutdown_requested,
+        loop_state="waiting_for_operator",
+        last_result=last_result,
+        force=True,
+    )
+
+    def refresh_waiting_heartbeat() -> None:
+        while not stop_event.wait(refresh_poll_s):
+            heartbeat.publish(
+                running=flags.running,
+                paused=flags.paused,
+                shutdown_requested=flags.shutdown_requested,
+                loop_state="waiting_for_operator",
+                last_result=last_result,
+            )
+
+    heartbeat_thread = threading.Thread(
+        target=refresh_waiting_heartbeat,
+        name="OperatorWaitHeartbeat",
+        daemon=True,
+    )
+    heartbeat_thread.start()
+
+    try:
+        input(
+            "\nScanner command loop setup:\n"
+            "  1. Confirm the Main scanner window and Watchlist "
+            "window are both open.\n"
+            "  2. Leave both ToS windows in their expected "
+            "positions.\n"
+            "  3. It is okay if File Explorer, VS Code, or the "
+            "browser is in front;\n"
+            "     each export action will surface its target ToS "
+            "window when needed.\n"
+            "  4. Drop JSON command files into the incoming folder "
+            "after the loop starts.\n"
+            "  5. Then press Enter here to start watching incoming "
+            "commands.\n\n"
+            "Press Enter when ready..."
+        )
+    finally:
+        stop_event.set()
+        heartbeat_thread.join()
+
+
+def _publish_stopped_heartbeat(
+    *,
+    heartbeat: ScannerHeartbeatPublisher,
+    flags: ScanRuntimeFlags,
+    last_result: JobResult | None,
+) -> None:
+    """Publish a consistent final stopped state."""
+    flags.running = False
+    flags.paused = False
+    flags.shutdown_requested = True
+
+    heartbeat.publish(
+        running=flags.running,
+        paused=flags.paused,
+        shutdown_requested=flags.shutdown_requested,
+        loop_state="stopped",
+        current_job=None,
+        last_result=last_result,
+        force=True,
+    )
+
+
 def main() -> None:
     logger = build_logger()
 
@@ -71,25 +157,23 @@ def main() -> None:
         logger=logger,
     )
 
-    heartbeat.publish(
-        running=flags.running,
-        paused=flags.paused,
-        shutdown_requested=flags.shutdown_requested,
-        loop_state="waiting_for_operator",
-        last_result=last_result,
-        force=True,
-    )
-
-    input(
-        "\nScanner command loop setup:\n"
-        "  1. Confirm the Main scanner window and Watchlist window are both open.\n"
-        "  2. Leave both ToS windows in their expected positions.\n"
-        "  3. It is okay if File Explorer, VS Code, or the browser is in front;\n"
-        "     each export action will surface its target ToS window when needed.\n"
-        "  4. Drop JSON command files into the incoming folder after the loop starts.\n"
-        "  5. Then press Enter here to start watching incoming commands.\n\n"
-        "Press Enter when ready..."
-    )
+    try:
+        _wait_for_operator(
+            heartbeat=heartbeat,
+            flags=flags,
+            last_result=last_result,
+        )
+    except KeyboardInterrupt:
+        logger.info(
+            "KeyboardInterrupt received while waiting for operator."
+        )
+        _publish_stopped_heartbeat(
+            heartbeat=heartbeat,
+            flags=flags,
+            last_result=last_result,
+        )
+        logger.info("V2 command loop stopped.")
+        return
 
     logger.info("Scanner command loop starting in 2 seconds.")
 
@@ -225,14 +309,10 @@ def main() -> None:
         logger.info("KeyboardInterrupt received; exiting.")
 
     finally:
-        heartbeat.publish(
-            running=flags.running,
-            paused=flags.paused,
-            shutdown_requested=flags.shutdown_requested,
-            loop_state="stopped",
-            current_job=None,
+        _publish_stopped_heartbeat(
+            heartbeat=heartbeat,
+            flags=flags,
             last_result=last_result,
-            force=True,
         )
 
     logger.info("V2 command loop stopped.")
