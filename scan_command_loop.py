@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
+import os
 import threading
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 from config import load_scanner_config
@@ -18,6 +21,11 @@ from tos_scan_action_executor import ToSScanActionExecutor
 
 
 USER_CLEAR_DELAY_S = 2.0
+ENV_SCAN_CONTROL = "MB_SCAN_CONTROL"
+
+DEFAULT_COMMAND_ROOT = Path(
+    r"C:\Users\DanLa\Documents\github\stockScans_control"
+)
 
 UI_ACTION_JOBS = {
     JobKind.EXPORT_WL,
@@ -26,6 +34,56 @@ UI_ACTION_JOBS = {
     JobKind.REPLACE_WL_SYMBOLS,
     JobKind.ADD_WL_SYMBOLS,
 }
+
+
+def parse_args(
+    argv: Sequence[str] | None = None,
+) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run the ToS scanner file-command loop."
+        ),
+    )
+
+    parser.add_argument(
+        "--root",
+        type=Path,
+        help=(
+            "Scanner command root. Defaults to MB_SCAN_CONTROL "
+            "when set, otherwise uses the local development root."
+        ),
+    )
+
+    return parser.parse_args(argv)
+
+
+def resolve_command_root(
+    explicit_root: Path | None,
+) -> Path:
+    """
+    Resolve the scanner command root.
+
+    Precedence:
+        1. Explicit --root argument
+        2. MB_SCAN_CONTROL environment variable
+        3. Local El-Cheapo development default
+    """
+    if explicit_root is not None:
+        root_text = str(explicit_root)
+    else:
+        configured_root = os.environ.get(
+            ENV_SCAN_CONTROL,
+            "",
+        ).strip()
+
+        if configured_root:
+            root_text = configured_root
+        else:
+            root_text = str(DEFAULT_COMMAND_ROOT)
+
+    return Path(
+        os.path.expandvars(root_text)
+    ).expanduser()
 
 
 def build_logger() -> logging.Logger:
@@ -127,12 +185,13 @@ def _publish_stopped_heartbeat(
     )
 
 
-def main() -> None:
+def main(
+    argv: Sequence[str] | None = None,
+) -> None:
+    args = parse_args(argv)
     logger = build_logger()
 
-    command_root = Path(
-        r"C:\Users\DanLa\Documents\github\stockScans_control"
-    )
+    command_root = resolve_command_root(args.root)
 
     ingress = FileCommandIngress(
         command_root=command_root,

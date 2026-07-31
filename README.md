@@ -128,7 +128,13 @@ The corresponding local directory on El-Cheapo is currently:
 C:\Users\DanLa\Documents\github\stockScans_control
 ```
 
-At present, that local path is assigned directly in `scan_command_loop.py`.
+The command root is resolved in this order:
+
+1. The `--root` command-line argument
+2. The `MB_SCAN_CONTROL` environment variable
+3. The local El-Cheapo development default:
+   `C:\Users\DanLa\Documents\github\stockScans_control`
+
 
 ### Command-directory layout
 
@@ -170,6 +176,12 @@ Start the loop from the repository root:
 
 ```cmd
 python scan_command_loop.py
+```
+
+Use an explicit command root:
+
+```cmd
+python scan_command_loop.py --root C:\path\to\scanner-control
 ```
 
 The program displays a setup checklist and waits at:
