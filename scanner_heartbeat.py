@@ -19,9 +19,8 @@ LOGGER_NAME = "scan_command_loop"
 
 
 def utc_now_text() -> str:
-    """
-    Return the current UTC time in a compact ISO-8601 form.
-    """
+    """Return the current UTC time in compact ISO-8601 form."""
+
     return (
         datetime.now(timezone.utc)
         .isoformat(timespec="seconds")
@@ -47,38 +46,59 @@ class ScannerHeartbeatPublisher:
     interval_s: float = 5.0
     application_name: str = "ToS_scanner"
     status_directory_name: str = "status"
-    heartbeat_filename: str = "scanner_heartbeat.json"
+    heartbeat_filename: str = (
+        "scanner_heartbeat.json"
+    )
     replace_retry_attempts: int = 6
-    replace_retry_initial_delay_s: float = 0.05
+    replace_retry_initial_delay_s: float = (
+        0.05
+    )
     replace_retry_max_delay_s: float = 0.5
 
-    started_at_utc: str = field(default_factory=utc_now_text)
-
-    _sequence: int = field(default=0, init=False)
-    _last_publish_monotonic: float | None = field(
+    started_at_utc: str = field(
+        default_factory=utc_now_text
+    )
+    _sequence: int = field(
+        default=0,
+        init=False,
+    )
+    _last_publish_monotonic: (
+        float | None
+    ) = field(
         default=None,
         init=False,
     )
 
     def __post_init__(self) -> None:
-        self.command_root = Path(self.command_root)
+        self.command_root = Path(
+            self.command_root
+        )
 
         if self.interval_s <= 0:
-            raise ValueError("interval_s must be greater than zero.")
+            raise ValueError(
+                "interval_s must be greater than "
+                "zero."
+            )
 
         if self.replace_retry_attempts < 1:
             raise ValueError(
-                "replace_retry_attempts must be at least one."
+                "replace_retry_attempts must be at "
+                "least one."
             )
 
-        if self.replace_retry_initial_delay_s < 0:
+        if (
+            self.replace_retry_initial_delay_s
+            < 0
+        ):
             raise ValueError(
-                "replace_retry_initial_delay_s cannot be negative."
+                "replace_retry_initial_delay_s "
+                "cannot be negative."
             )
 
         if self.replace_retry_max_delay_s < 0:
             raise ValueError(
-                "replace_retry_max_delay_s cannot be negative."
+                "replace_retry_max_delay_s cannot "
+                "be negative."
             )
 
         if (
@@ -86,15 +106,18 @@ class ScannerHeartbeatPublisher:
             < self.replace_retry_initial_delay_s
         ):
             raise ValueError(
-                "replace_retry_max_delay_s cannot be less than "
+                "replace_retry_max_delay_s cannot "
+                "be less than "
                 "replace_retry_initial_delay_s."
             )
 
         self.status_dir = (
-            self.command_root / self.status_directory_name
+            self.command_root
+            / self.status_directory_name
         )
         self.heartbeat_path = (
-            self.status_dir / self.heartbeat_filename
+            self.status_dir
+            / self.heartbeat_filename
         )
 
     def publish(
@@ -104,6 +127,7 @@ class ScannerHeartbeatPublisher:
         paused: bool,
         shutdown_requested: bool,
         loop_state: str,
+        exports_suspended: bool = False,
         current_job: JobRequest | None = None,
         last_result: JobResult | None = None,
         force: bool = False,
@@ -117,42 +141,69 @@ class ScannerHeartbeatPublisher:
         transient Windows/SMB PermissionError failures exhausted the bounded
         retry policy. A skipped heartbeat never terminates the command loop.
         """
+
         now_monotonic = time.monotonic()
 
         if (
             not force
-            and self._last_publish_monotonic is not None
+            and self._last_publish_monotonic
+            is not None
             and (
-                now_monotonic - self._last_publish_monotonic
+                now_monotonic
+                - self._last_publish_monotonic
                 < self.interval_s
             )
         ):
             return False
 
         self._sequence += 1
+
         payload: dict[str, Any] = {
             "schema_version": 1,
-            "application": self.application_name,
+            "application": (
+                self.application_name
+            ),
             "host": socket.gethostname(),
             "pid": os.getpid(),
-            "started_at_utc": self.started_at_utc,
-            "heartbeat_at_utc": utc_now_text(),
-            "heartbeat_sequence": self._sequence,
-            "heartbeat_interval_s": self.interval_s,
+            "started_at_utc": (
+                self.started_at_utc
+            ),
+            "heartbeat_at_utc": (
+                utc_now_text()
+            ),
+            "heartbeat_sequence": (
+                self._sequence
+            ),
+            "heartbeat_interval_s": (
+                self.interval_s
+            ),
             "loop_state": loop_state,
             "running": running,
             "paused": paused,
-            "shutdown_requested": shutdown_requested,
-            "current_job": self._job_payload(current_job),
-            "last_job": self._result_payload(last_result),
+            "exports_suspended": (
+                exports_suspended
+            ),
+            "shutdown_requested": (
+                shutdown_requested
+            ),
+            "current_job": self._job_payload(
+                current_job
+            ),
+            "last_job": self._result_payload(
+                last_result
+            ),
         }
 
-        written = self._write_atomically(payload)
+        written = self._write_atomically(
+            payload
+        )
 
         # Throttle the next normal attempt even if this attempt was skipped
         # after exhausting transient-lock retries. Forced state transitions
         # can still try immediately.
-        self._last_publish_monotonic = now_monotonic
+        self._last_publish_monotonic = (
+            now_monotonic
+        )
 
         return written
 
@@ -160,7 +211,10 @@ class ScannerHeartbeatPublisher:
         self,
         payload: dict[str, Any],
     ) -> bool:
-        self.status_dir.mkdir(parents=True, exist_ok=True)
+        self.status_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
 
         serialized = (
             json.dumps(
@@ -171,14 +225,20 @@ class ScannerHeartbeatPublisher:
             + "\n"
         )
 
-        delay_s = self.replace_retry_initial_delay_s
-        last_error: PermissionError | None = None
+        delay_s = (
+            self.replace_retry_initial_delay_s
+        )
+        last_error: (
+            PermissionError | None
+        ) = None
 
         for attempt in range(
             1,
             self.replace_retry_attempts + 1,
         ):
-            temporary_path = self._temporary_path(attempt)
+            temporary_path = (
+                self._temporary_path(attempt)
+            )
 
             try:
                 temporary_path.write_text(
@@ -195,7 +255,10 @@ class ScannerHeartbeatPublisher:
                     temporary_path
                 )
 
-                if attempt >= self.replace_retry_attempts:
+                if (
+                    attempt
+                    >= self.replace_retry_attempts
+                ):
                     break
 
                 if delay_s > 0:
@@ -212,10 +275,13 @@ class ScannerHeartbeatPublisher:
 
         assert last_error is not None
 
-        logging.getLogger(LOGGER_NAME).error(
-            "Heartbeat publication failed after %d attempt(s); "
-            "scanner loop will continue and retry on a later "
-            "publication: %s",
+        logging.getLogger(
+            LOGGER_NAME
+        ).error(
+            "Heartbeat publication failed "
+            "after %d attempt(s); scanner loop "
+            "will continue and retry on a "
+            "later publication: %s",
             self.replace_retry_attempts,
             last_error,
         )
@@ -238,10 +304,14 @@ class ScannerHeartbeatPublisher:
         temporary_path: Path,
     ) -> None:
         try:
-            temporary_path.unlink(missing_ok=True)
+            temporary_path.unlink(
+                missing_ok=True
+            )
         except OSError:
-            # Cleanup is best-effort. Never replace the useful original
-            # exception with a temporary-file cleanup failure.
+            # Cleanup is best-effort. Never
+            # replace the useful original
+            # exception with a temporary-file
+            # cleanup failure.
             pass
 
     @staticmethod
@@ -253,9 +323,16 @@ class ScannerHeartbeatPublisher:
 
         return {
             "kind": request.kind.value,
-            "command_id": request.command_id,
-            "origin": request.origin.value,
-            "requested_at": request.requested_at.isoformat(),
+            "command_id": (
+                request.command_id
+            ),
+            "origin": (
+                request.origin.value
+            ),
+            "requested_at": (
+                request.requested_at
+                .isoformat()
+            ),
         }
 
     @staticmethod
@@ -266,8 +343,12 @@ class ScannerHeartbeatPublisher:
             return None
 
         return {
-            "kind": result.request.kind.value,
-            "command_id": result.request.command_id,
+            "kind": (
+                result.request.kind.value
+            ),
+            "command_id": (
+                result.request.command_id
+            ),
             "ok": result.ok,
             "message": result.message,
             "error": result.error,
