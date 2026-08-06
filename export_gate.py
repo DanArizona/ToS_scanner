@@ -19,6 +19,36 @@ STATUS_DIRECTORY_NAME = "status"
 EXPORT_GATE_FILENAME = "export_gate.json"
 EXPORT_ACTION_LOCK_FILENAME = "export_action.lock"
 
+ENV_SCAN_CONTROL = "MB_SCAN_CONTROL"
+DEFAULT_COMMAND_ROOT = Path(
+    r"C:\Users\DanLa\Documents\github\stockScans_control"
+)
+
+
+def resolve_command_root(
+    explicit_root: Path | None = None,
+) -> Path:
+    """
+    Resolve the shared command root used by scanner processes.
+
+    Precedence:
+      1. Explicit path
+      2. MB_SCAN_CONTROL
+      3. El-Cheapo development default
+    """
+
+    if explicit_root is not None:
+        raw_text = str(explicit_root)
+    else:
+        raw_text = os.environ.get(
+            ENV_SCAN_CONTROL,
+            "",
+        ).strip() or str(DEFAULT_COMMAND_ROOT)
+
+    return Path(
+        os.path.expandvars(raw_text)
+    ).expanduser()
+
 
 def utc_now_text() -> str:
     """Return the current UTC time in compact ISO-8601 form."""
@@ -484,6 +514,29 @@ class ExportGate:
             return None
 
         return lock
+
+    def wait_until_resumed(
+        self,
+        stop_event: Event,
+        *,
+        poll_s: float = 0.10,
+    ) -> bool:
+        """
+        Wait until exports are active again.
+
+        Return False when shutdown is requested before the gate resumes.
+        """
+
+        if poll_s <= 0:
+            raise ValueError(
+                "poll_s must be positive."
+            )
+
+        while self.is_suspended():
+            if stop_event.wait(poll_s):
+                return False
+
+        return True
 
     def close(self) -> None:
         """
