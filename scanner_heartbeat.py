@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import socket
 import time
@@ -12,6 +13,9 @@ from pathlib import Path
 from typing import Any
 
 from scan_jobs import JobRequest, JobResult
+
+
+LOGGER_NAME = "scan_command_loop"
 
 
 def utc_now_text() -> str:
@@ -32,6 +36,11 @@ class ScannerHeartbeatPublisher:
 
     Normal calls are rate-limited by interval_s. Pass force=True when an
     important state transition should be visible immediately.
+
+    Windows and SMB readers can briefly prevent replacement of the existing
+    heartbeat file. Such PermissionError failures are retried with bounded
+    exponential backoff. If the file remains locked, publication is logged
+    and skipped so the scanner command loop can continue running.
     """
 
     command_root: Path
@@ -39,6 +48,9 @@ class ScannerHeartbeatPublisher:
     application_name: str = "ToS_scanner"
     status_directory_name: str = "status"
     heartbeat_filename: str = "scanner_heartbeat.json"
+    replace_retry_attempts: int = 6
+    replace_retry_initial_delay_s: float = 0.05
+    replace_retry_max_delay_s: float = 0.5
 
     started_at_utc: str = field(default_factory=utc_now_text)
 
@@ -53,6 +65,30 @@ class ScannerHeartbeatPublisher:
 
         if self.interval_s <= 0:
             raise ValueError("interval_s must be greater than zero.")
+
+        if self.replace_retry_attempts < 1:
+            raise ValueError(
+                "replace_retry_attempts must be at least one."
+            )
+
+        if self.replace_retry_initial_delay_s < 0:
+            raise ValueError(
+                "replace_retry_initial_delay_s cannot be negative."
+            )
+
+        if self.replace_retry_max_delay_s < 0:
+            raise ValueError(
+                "replace_retry_max_delay_s cannot be negative."
+            )
+
+        if (
+            self.replace_retry_max_delay_s
+            < self.replace_retry_initial_delay_s
+        ):
+            raise ValueError(
+                "replace_retry_max_delay_s cannot be less than "
+                "replace_retry_initial_delay_s."
+            )
 
         self.status_dir = (
             self.command_root / self.status_directory_name
@@ -75,8 +111,11 @@ class ScannerHeartbeatPublisher:
         """
         Publish one heartbeat.
 
-        Returns True when a file was written. Returns False when a normal
-        publication was skipped because interval_s has not elapsed.
+        Returns True when a file was written.
+
+        Returns False when a normal publication was rate-limited or when
+        transient Windows/SMB PermissionError failures exhausted the bounded
+        retry policy. A skipped heartbeat never terminates the command loop.
         """
         now_monotonic = time.monotonic()
 
@@ -91,7 +130,6 @@ class ScannerHeartbeatPublisher:
             return False
 
         self._sequence += 1
-
         payload: dict[str, Any] = {
             "schema_version": 1,
             "application": self.application_name,
@@ -109,32 +147,102 @@ class ScannerHeartbeatPublisher:
             "last_job": self._result_payload(last_result),
         }
 
-        self._write_atomically(payload)
+        written = self._write_atomically(payload)
+
+        # Throttle the next normal attempt even if this attempt was skipped
+        # after exhausting transient-lock retries. Forced state transitions
+        # can still try immediately.
         self._last_publish_monotonic = now_monotonic
 
-        return True
+        return written
 
     def _write_atomically(
         self,
         payload: dict[str, Any],
-    ) -> None:
+    ) -> bool:
         self.status_dir.mkdir(parents=True, exist_ok=True)
 
-        temporary_path = self.heartbeat_path.with_name(
-            f".{self.heartbeat_filename}.{os.getpid()}.tmp"
-        )
-
-        temporary_path.write_text(
+        serialized = (
             json.dumps(
                 payload,
                 indent=2,
                 sort_keys=True,
             )
-            + "\n",
-            encoding="utf-8",
+            + "\n"
         )
 
-        temporary_path.replace(self.heartbeat_path)
+        delay_s = self.replace_retry_initial_delay_s
+        last_error: PermissionError | None = None
+
+        for attempt in range(
+            1,
+            self.replace_retry_attempts + 1,
+        ):
+            temporary_path = self._temporary_path(attempt)
+
+            try:
+                temporary_path.write_text(
+                    serialized,
+                    encoding="utf-8",
+                )
+                temporary_path.replace(
+                    self.heartbeat_path
+                )
+                return True
+            except PermissionError as exc:
+                last_error = exc
+                self._remove_temporary_file(
+                    temporary_path
+                )
+
+                if attempt >= self.replace_retry_attempts:
+                    break
+
+                if delay_s > 0:
+                    time.sleep(delay_s)
+                    delay_s = min(
+                        delay_s * 2,
+                        self.replace_retry_max_delay_s,
+                    )
+            except Exception:
+                self._remove_temporary_file(
+                    temporary_path
+                )
+                raise
+
+        assert last_error is not None
+
+        logging.getLogger(LOGGER_NAME).error(
+            "Heartbeat publication failed after %d attempt(s); "
+            "scanner loop will continue and retry on a later "
+            "publication: %s",
+            self.replace_retry_attempts,
+            last_error,
+        )
+
+        return False
+
+    def _temporary_path(
+        self,
+        attempt: int,
+    ) -> Path:
+        return self.heartbeat_path.with_name(
+            f".{self.heartbeat_filename}."
+            f"{os.getpid()}."
+            f"{self._sequence}."
+            f"{attempt}.tmp"
+        )
+
+    @staticmethod
+    def _remove_temporary_file(
+        temporary_path: Path,
+    ) -> None:
+        try:
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            # Cleanup is best-effort. Never replace the useful original
+            # exception with a temporary-file cleanup failure.
+            pass
 
     @staticmethod
     def _job_payload(
