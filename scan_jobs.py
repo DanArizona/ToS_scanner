@@ -25,6 +25,8 @@ class JobKind(str, Enum):
     STOP = "stop"
     PAUSE = "pause"
     RESUME = "resume"
+    SUSPEND_EXPORTS = "suspend_exports"
+    RESUME_EXPORTS = "resume_exports"
 
 
 class JobOrigin(str, Enum):
@@ -60,5 +62,3 @@ class JobResult:
     message: str
     output_path: Path | None = None
     error: str | None = None
-
-    
