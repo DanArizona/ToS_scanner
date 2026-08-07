@@ -102,6 +102,17 @@ class RecordingExporter:
             tuple[Path, datetime]
         ] = []
 
+    def _record(
+        self,
+        path: Path,
+        slot: datetime,
+    ) -> None:
+        self.calls.append((path, slot))
+        self.stop_event.set()
+
+        if self.failure is not None:
+            raise self.failure
+
     def export_scan(
         self,
         path: Path,
@@ -109,11 +120,16 @@ class RecordingExporter:
         *,
         stop_event: threading.Event,
     ) -> None:
-        self.calls.append((path, slot))
-        self.stop_event.set()
+        self._record(path, slot)
 
-        if self.failure is not None:
-            raise self.failure
+    def export_watchlist(
+        self,
+        path: Path,
+        slot: datetime,
+        *,
+        stop_event: threading.Event,
+    ) -> None:
+        self._record(path, slot)
 
 
 class FakeGate:

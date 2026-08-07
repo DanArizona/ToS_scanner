@@ -29,6 +29,7 @@ from scan_control_state import (
 )
 from scan_artifacts import (
     SOURCE_TOS_SCAN,
+    SOURCE_WATCHLIST,
     ScanArtifactSpec,
 )
 from scheduler import (
@@ -36,6 +37,28 @@ from scheduler import (
     SchedulerFlags,
     next_slot_after,
 )
+
+
+WATCHLIST_SLOT_SECONDS = frozenset({5, 20, 35})
+SCANNER_SLOT_SECOND = 50
+
+
+def scheduled_source_for_slot(
+    slot_et: datetime,
+) -> str:
+    """Return the output source assigned to one scheduled slot."""
+
+    if slot_et.second in WATCHLIST_SLOT_SECONDS:
+        return SOURCE_WATCHLIST
+
+    if slot_et.second == SCANNER_SLOT_SECOND:
+        return SOURCE_TOS_SCAN
+
+    raise ValueError(
+        "Unsupported scheduled export second: "
+        f"{slot_et.second}. Expected one of "
+        "05, 20, 35, or 50."
+    )
 
 
 class ScanRunner:
@@ -144,17 +167,21 @@ class ScanRunner:
                 now_et,
                 gate_active,
             )
+            source_name = scheduled_source_for_slot(
+                slot_et
+            )
             csv_path = (
                 self.output_dir
                 / ScanArtifactSpec(
-                    SOURCE_TOS_SCAN
+                    source_name
                 ).filename_for(slot_et)
             )
 
             self.logger.info(
-                "Next slot=%s gate_active=%s "
+                "Next slot=%s source=%s gate_active=%s "
                 "paused=%s target_csv=%s",
                 slot_et.isoformat(),
+                source_name,
                 gate_active,
                 paused,
                 csv_path,
@@ -228,11 +255,19 @@ class ScanRunner:
                 self.shared_state.touch(
                     phase="executing_gui"
                 )
-                self.exporter.export_scan(
-                    csv_path,
-                    slot_et,
-                    stop_event=self.stop_event,
-                )
+
+                if source_name == SOURCE_WATCHLIST:
+                    self.exporter.export_watchlist(
+                        csv_path,
+                        slot_et,
+                        stop_event=self.stop_event,
+                    )
+                else:
+                    self.exporter.export_scan(
+                        csv_path,
+                        slot_et,
+                        stop_event=self.stop_event,
+                    )
 
                 self.shared_state.mark_completed(
                     slot_et

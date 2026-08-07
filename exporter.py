@@ -15,8 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Protocol
 from zoneinfo import ZoneInfo
-from scheduler import ET
 
+from scheduler import ET
 from config import ScannerConfig
 from layout import load_widget_layout
 from tos_pwidget_actions import ToSActionsController
@@ -35,6 +35,14 @@ class ScanExporter(Protocol):
     ) -> None:
         ...
 
+    def export_watchlist(
+        self,
+        csv_path: Path,
+        slot_et: datetime,
+        stop_event: Optional[threading.Event] = None,
+    ) -> None:
+        ...
+
     def perform_user_scan(
         self,
         *,
@@ -45,11 +53,8 @@ class ScanExporter(Protocol):
 
 class ToSPseudoWidgetExporter:
     """
-    Reuses the tested ToSActionsController sequence:
-      export_csv_file()
-      enter_filename(filename, target_dir)
-      confirm_save()
-      verify_save(target_dir, filename)
+    Reuses the tested ToSActionsController export sequences for scanner and
+    Watchlist CSV output.
 
     Also provides perform_user_scan() for the UI Scan button.
     """
@@ -67,7 +72,6 @@ class ToSPseudoWidgetExporter:
         self.cfg = cfg
         self.dry_run = dry_run
         self.verify_timeout_s = verify_timeout_s
-
         self.controller = ToSActionsController(
             layout_path=layout_path or cfg.pwidget_yaml_path,
             cfg=cfg,
@@ -85,9 +89,17 @@ class ToSPseudoWidgetExporter:
         self.controller.CLICK_PAUSE_S = 0.08
         self.controller.STEP_PAUSE_S = 0.15
 
-    def _check_stop(self, stop_event: Optional[threading.Event]) -> None:
-        if stop_event is not None and stop_event.is_set():
-            raise InterruptedError("Stop requested during export sequence.")
+    def _check_stop(
+        self,
+        stop_event: Optional[threading.Event],
+    ) -> None:
+        if (
+            stop_event is not None
+            and stop_event.is_set()
+        ):
+            raise InterruptedError(
+                "Stop requested during export sequence."
+            )
 
     def setup_scan_export_dialog(
         self,
@@ -98,36 +110,51 @@ class ToSPseudoWidgetExporter:
     ) -> None:
         """
         One-time setup for the scan export dialog.
-
         Opens the scan export dialog, normalizes the dialog size, sets the
         export directory, saves a small setup CSV to force ToS to persist the
         directory, verifies the save, then removes the setup CSV.
         """
-        self.logger.info("GUI | Begin scan export dialog setup")
-        self.logger.info("GUI | Setup export directory: %s", target_dir)
+
+        self.logger.info(
+            "GUI | Begin scan export dialog setup"
+        )
+        self.logger.info(
+            "GUI | Setup export directory: %s",
+            target_dir,
+        )
 
         if self.dry_run:
-            self.logger.info("DRY RUN | scan export dialog setup skipped")
+            self.logger.info(
+                "DRY RUN | scan export dialog setup skipped"
+            )
             return
 
-        target_dir = Path(target_dir).expanduser().resolve()
-        target_dir.mkdir(parents=True, exist_ok=True)
+        target_dir = (
+            Path(target_dir).expanduser().resolve()
+        )
+        target_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
         setup_path = target_dir / setup_filename
 
         if setup_path.exists():
             try:
                 setup_path.unlink()
-                self.logger.info("GUI | Removed stale setup CSV: %s", setup_path)
+                self.logger.info(
+                    "GUI | Removed stale setup CSV: %s",
+                    setup_path,
+                )
             except Exception:
                 self.logger.warning(
-                    "GUI | Could not remove stale setup CSV before setup save: %s",
+                    "GUI | Could not remove stale setup CSV "
+                    "before setup save: %s",
                     setup_path,
                     exc_info=True,
                 )
 
         with self.controller.action_lock:
             self._check_stop(stop_event)
-
             self.controller.export_csv_file()
             self._check_stop(stop_event)
 
@@ -152,22 +179,30 @@ class ToSPseudoWidgetExporter:
 
             if not ok:
                 raise TimeoutError(
-                    f"Setup CSV file was not verified within timeout: {setup_path}"
+                    "Setup CSV file was not verified "
+                    f"within timeout: {setup_path}"
                 )
 
         try:
             setup_path.unlink()
-            self.logger.info("GUI | Removed setup CSV after verification: %s", setup_path)
+            self.logger.info(
+                "GUI | Removed setup CSV after "
+                "verification: %s",
+                setup_path,
+            )
         except FileNotFoundError:
             pass
         except Exception:
             self.logger.warning(
-                "GUI | Could not remove setup CSV after verification: %s",
+                "GUI | Could not remove setup CSV after "
+                "verification: %s",
                 setup_path,
                 exc_info=True,
             )
 
-        self.logger.info("GUI | Scan export dialog setup complete")
+        self.logger.info(
+            "GUI | Scan export dialog setup complete"
+        )
 
     def export_scan(
         self,
@@ -175,16 +210,29 @@ class ToSPseudoWidgetExporter:
         slot_et: datetime,
         stop_event: Optional[threading.Event] = None,
     ) -> None:
-        self.logger.info("GUI | Begin export for slot %s", slot_et.isoformat())
-        self.logger.info("GUI | Target CSV filename: %s", csv_path.name)
+        self.logger.info(
+            "GUI | Begin scan export for slot %s",
+            slot_et.isoformat(),
+        )
+        self.logger.info(
+            "GUI | Target scan CSV filename: %s",
+            csv_path.name,
+        )
 
         if self.dry_run:
-            csv_path.parent.mkdir(parents=True, exist_ok=True)
+            csv_path.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
             csv_path.write_text(
-                "Symbol,%Change,Volume,Last\nTEST,+0.00%,1000,1.23\n",
+                "Symbol,%Change,Volume,Last\n"
+                "TEST,+0.00%,1000,1.23\n",
                 encoding="utf-8",
             )
-            self.logger.info("DRY RUN | Stub CSV created at %s", csv_path)
+            self.logger.info(
+                "DRY RUN | Stub scan CSV created at %s",
+                csv_path,
+            )
             return
 
         # Hold the controller lock for the full export sequence so that
@@ -194,7 +242,10 @@ class ToSPseudoWidgetExporter:
             self.controller.export_csv_file()
 
             self._check_stop(stop_event)
-            self.controller.enter_filename(csv_path.name, csv_path.parent)
+            self.controller.enter_filename(
+                csv_path.name,
+                csv_path.parent,
+            )
 
             self._check_stop(stop_event)
             self.controller.confirm_save()
@@ -208,9 +259,86 @@ class ToSPseudoWidgetExporter:
             )
 
             if not ok:
-                raise TimeoutError(f"CSV file was not verified within timeout: {csv_path}")
+                raise TimeoutError(
+                    "CSV file was not verified within "
+                    f"timeout: {csv_path}"
+                )
 
-        self.logger.info("CSV output verified: %s", csv_path)
+        self.logger.info(
+            "CSV output verified: %s",
+            csv_path,
+        )
+
+    def export_watchlist(
+        self,
+        csv_path: Path,
+        slot_et: datetime,
+        stop_event: Optional[threading.Event] = None,
+    ) -> None:
+        """Export the current ThinkOrSwim Watchlist to the scheduled WL CSV."""
+
+        self.logger.info(
+            "GUI | Begin Watchlist export for slot %s",
+            slot_et.isoformat(),
+        )
+        self.logger.info(
+            "GUI | Target Watchlist CSV filename: %s",
+            csv_path.name,
+        )
+
+        if self.dry_run:
+            csv_path.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            csv_path.write_text(
+                "Symbol,Source\n"
+                "DRYRUN,Watchlist\n",
+                encoding="utf-8",
+            )
+            self.logger.info(
+                "DRY RUN | Stub Watchlist CSV created at %s",
+                csv_path,
+            )
+            return
+
+        # The action controller uses an RLock, so holding the lock around the
+        # complete Watchlist sequence is compatible with its individual
+        # high-level action methods and prevents other GUI actions interleaving.
+        with self.controller.action_lock:
+            self._check_stop(stop_event)
+            self.controller.open_watchlist_export()
+
+            self._check_stop(stop_event)
+            self.controller.normalize_watchlist_export_dialog()
+
+            self._check_stop(stop_event)
+            self.controller.enter_watchlist_filename_then_export_directory(
+                csv_path.name,
+                csv_path.parent,
+            )
+
+            self._check_stop(stop_event)
+            self.controller.confirm_watchlist_save()
+
+            self._check_stop(stop_event)
+            ok = self.controller.verify_save(
+                csv_path.parent,
+                csv_path.name,
+                timeout_s=self.verify_timeout_s,
+                stop_event=stop_event,
+            )
+
+            if not ok:
+                raise TimeoutError(
+                    "Watchlist CSV file was not verified "
+                    f"within timeout: {csv_path}"
+                )
+
+        self.logger.info(
+            "Watchlist CSV output verified: %s",
+            csv_path,
+        )
 
     def perform_user_scan(
         self,
@@ -218,11 +346,15 @@ class ToSPseudoWidgetExporter:
         stop_event: Optional[threading.Event] = None,
     ) -> None:
         if self.dry_run:
-            self.logger.info("DRY RUN | user_scan skipped")
+            self.logger.info(
+                "DRY RUN | user_scan skipped"
+            )
             return
 
         self._check_stop(stop_event)
-        self.controller.user_scan(pre_wait_s=1.0)
+        self.controller.user_scan(
+            pre_wait_s=1.0
+        )
 
     def scan_and_export_now(
         self,
@@ -232,31 +364,53 @@ class ToSPseudoWidgetExporter:
     ) -> Path:
         """
         Perform an immediate ToS scan refresh, then export the results to CSV.
-
         This is the manual "Scan and Export CSV" workflow. It uses the current
         ToS export dialog directory, so Manual Init should be run first after
         changing the output directory.
         """
-        output_dir = Path(output_dir).expanduser().resolve()
-        output_dir.mkdir(parents=True, exist_ok=True)
+
+        output_dir = (
+            Path(output_dir).expanduser().resolve()
+        )
+        output_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
 
         now_et = datetime.now(ET)
-        filename = ScanArtifactSpec(SOURCE_TOS_MANUAL).filename_for(now_et)
+        filename = ScanArtifactSpec(
+            SOURCE_TOS_MANUAL
+        ).filename_for(now_et)
         csv_path = output_dir / filename
 
-        self.logger.info("GUI | Begin manual scan and export")
-        self.logger.info("GUI | Manual CSV filename: %s", filename)
-        self.logger.info("GUI | Manual CSV target: %s", csv_path)
+        self.logger.info(
+            "GUI | Begin manual scan and export"
+        )
+        self.logger.info(
+            "GUI | Manual CSV filename: %s",
+            filename,
+        )
+        self.logger.info(
+            "GUI | Manual CSV target: %s",
+            csv_path,
+        )
 
         if self.dry_run:
             csv_path.write_text(
-                "symbol,source\nDRYRUN,manual-scan-export\n",
+                "symbol,source\n"
+                "DRYRUN,manual-scan-export\n",
                 encoding="utf-8",
             )
-            self.logger.info("DRY RUN | Manual stub CSV created at %s", csv_path)
+            self.logger.info(
+                "DRY RUN | Manual stub CSV "
+                "created at %s",
+                csv_path,
+            )
             return csv_path
 
-        self.perform_user_scan(stop_event=stop_event)
+        self.perform_user_scan(
+            stop_event=stop_event
+        )
         self._check_stop(stop_event)
 
         # Give ToS a short moment to refresh the displayed scan results after
@@ -264,8 +418,14 @@ class ToSPseudoWidgetExporter:
         time.sleep(1.0)
         self._check_stop(stop_event)
 
-        self.export_scan(csv_path, now_et, stop_event=stop_event)
+        self.export_scan(
+            csv_path,
+            now_et,
+            stop_event=stop_event,
+        )
 
-        self.logger.info("GUI | Manual scan and export complete: %s", csv_path)
+        self.logger.info(
+            "GUI | Manual scan and export complete: %s",
+            csv_path,
+        )
         return csv_path
-    
