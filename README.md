@@ -216,6 +216,8 @@ The current `mb-scan-command` sender supports:
 | `pause`              | Mark the scanner as paused                              |
 | `resume`             | Resume scanner operation                                |
 | `export_wl`          | Export the current ThinkOrSwim Watchlist                |
+| `suspend_exports`    | Suspend scheduled scanner and Watchlist exports         |
+| `resume_exports`     | Resume scheduled scanner and Watchlist exports          |
 | `replace_wl_symbols` | Replace the symbols in the personal `Default` Watchlist |
 | `add_wl_symbols`     | Add symbols to the personal `Default` Watchlist         |
 
@@ -224,6 +226,8 @@ Example commands from MasterBot:
 ```cmd
 mb-scan-command start --wait 10
 mb-scan-command export_wl --wait 10
+mb-scan-command suspend_exports --wait 10
+mb-scan-command resume_exports --wait 10
 mb-scan-command pause --wait 10
 mb-scan-command resume --wait 10
 mb-scan-command stop --wait 10
@@ -250,6 +254,26 @@ Symbol input may be separated by spaces or commas. Symbols are:
 
 The ThinkOrSwim workflow selects the personal `Default` Watchlist, opens **Import**, selects either **Replace** or **Add**, chooses **Paste Symbols**, accepts the dialog, and verifies that the Symbols Import window closes.
 
+### Export suspension and Watchlist coordination
+
+`pause` and `suspend_exports` serve different purposes.
+
+`pause` pauses scanner runtime operation. `suspend_exports` leaves the command loop operational while preventing scheduled ThinkOrSwim exports from starting.
+
+The normal Watchlist replacement sequence is:
+
+1. `mb-scan-command suspend_exports --wait 10`
+2. `mb-scan-command replace_wl_symbols --symbols AAPL MSFT NVDA --wait 10`
+3. `mb-scan-command resume_exports --wait 10`
+
+Watchlist symbol replacement and addition remain permitted while exports are suspended.
+
+Explicit `export_wl` requests are also prevented from running while exports are suspended.
+
+The export-suspension state is persisted under the scanner command root. If the command-loop process stops and is restarted while exports are suspended, the new process restores the suspended state. Exports remain suspended until an explicit `resume_exports` command is processed.
+
+The scanner heartbeat reports this state using `exports_suspended`. A current heartbeat with `loop_state` equal to `exports_suspended` is a healthy operational state, not a scanner failure.
+
 ### Meaning of `--wait`
 
 `mb-scan-command --wait` waits for the command file to reach either the `processed` or `failed` ingress directory.
@@ -263,6 +287,7 @@ The v2 dispatcher tracks:
 ```text
 running
 paused
+exports_suspended
 shutdown_requested
 ```
 
@@ -408,6 +433,26 @@ Example Watchlist export:
 
 `TS`, `TM`, and `WL` files are produced by this scanner project. `SA` and `MA` files are expected to be produced elsewhere on the LAN.
 
+### Scheduled export routing
+
+Scheduled export slots are evaluated in New York market time.
+
+The current routing is:
+
+- `:05` -> ThinkOrSwim Watchlist export (`WL`)
+- `:20` -> ThinkOrSwim Watchlist export (`WL`)
+- `:35` -> ThinkOrSwim Watchlist export (`WL`)
+- `:50` -> ThinkOrSwim scanner export (`TS`)
+
+For example, during one minute the scheduled output may include filenames ending in:
+
+- `-05-WL.csv`
+- `-20-WL.csv`
+- `-35-WL.csv`
+- `-50-TS.csv`
+
+Both Watchlist and scanner scheduled exports use the shared export gate. When exports are suspended, neither type of scheduled ThinkOrSwim GUI export is allowed to begin.
+
 ## Legacy v1 GUI
 
 The v1 Qt control panel is titled:
@@ -479,6 +524,21 @@ A useful v2 smoke test is:
 11. Test Replace and Add Watchlist symbols.
 12. Send `stop`.
 13. Confirm status changes to `STOPPED`.
+
+### Export-gate restart smoke test
+
+A useful persistence test is:
+
+1. Start `scan_command_loop.py` and allow it to reach its command loop.
+2. Send `suspend_exports`.
+3. Confirm `mb-scan-status` reports `Exports suspended: yes`.
+4. Stop the command loop without sending `resume_exports`.
+5. Restart `scan_command_loop.py`.
+6. Confirm the restarted process still reports `Exports suspended: yes`.
+7. Send `resume_exports`.
+8. Confirm the loop returns to `idle` and reports `Exports suspended: no`.
+
+This verifies that export suspension survives a command-loop process restart.
 
 ## Repository notes
 
