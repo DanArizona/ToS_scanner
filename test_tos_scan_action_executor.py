@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from scan_jobs import JobKind, JobOrigin, JobRequest
 from tos_scan_action_executor import ToSScanActionExecutor
 
@@ -73,6 +75,7 @@ def make_request(
     kind: JobKind,
     symbols: list[str] | None = None,
     symbol_file: Path | None = None,
+    target_filename: str | None = None,
 ) -> JobRequest:
     return JobRequest(
         kind=kind,
@@ -80,6 +83,7 @@ def make_request(
         requested_at=datetime(2026, 7, 20, 5, 0, 0),
         symbols=list(symbols or []),
         symbol_file=symbol_file,
+        target_filename=target_filename,
         command_id="test-command",
     )
 
@@ -238,3 +242,67 @@ def test_add_wl_symbols_uses_singular_word_for_one_symbol(
     assert result.message == "Added 1 symbol to Default WL."
     assert controller.add_calls == ["AMD"]
     assert controller.replace_calls == []
+
+
+def test_export_wl_with_target_filename_copies_verification_csv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_dir = tmp_path / "local_scans"
+    lan_scans_dir = tmp_path / "lan_scans"
+
+    executor = ToSScanActionExecutor(
+        action_controller=None,
+        output_dir=output_dir,
+        lan_scans_dir=lan_scans_dir,
+    )
+
+    request = make_request(
+        kind=JobKind.EXPORT_WL,
+        target_filename="objective2-test-WL.csv",
+    )
+
+    def fake_export(output_path: Path) -> None:
+        output_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        output_path.write_text(
+            "Symbol,Value\n"
+            "NVDA,1\n"
+            "TSLA,2\n",
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(
+        executor,
+        "_export_wl_with_existing_controller",
+        fake_export,
+    )
+
+    result = executor.export_wl(request)
+
+    local_path = (
+        output_dir
+        / "objective2-test-WL.csv"
+    )
+    verification_path = (
+        lan_scans_dir
+        / "watchlist_verify"
+        / "objective2-test-WL.csv"
+    )
+
+    assert result.ok is True
+    assert result.error is None
+
+    assert local_path.exists()
+    assert verification_path.exists()
+
+    assert (
+        verification_path.read_text(
+            encoding="utf-8"
+        )
+        == local_path.read_text(
+            encoding="utf-8"
+        )
+    )

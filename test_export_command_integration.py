@@ -119,7 +119,80 @@ def test_new_job_kind_values() -> None:
     )
 
 
-def test_suspension_blocks_exports_but_allows_watchlist_update(
+# def test_suspension_allows_watchlist_update_and_explicit_wl_export(
+#     tmp_path: Path,
+# ) -> None:
+#     gate = ExportGate(tmp_path)
+#     flags = ScanRuntimeFlags(
+#         running=True
+#     )
+#     executor = RecordingExecutor()
+#     dispatcher = ScanDispatcher(
+#         flags=flags,
+#         action_executor=executor,
+#         export_gate=gate,
+#     )
+
+#     suspended = dispatcher.execute(
+#         make_request(
+#             JobKind.SUSPEND_EXPORTS
+#         )
+#     )
+
+#     assert suspended.ok is True
+#     assert flags.exports_suspended is True
+#     assert gate.is_suspended() is True
+
+#     replacement = dispatcher.execute(
+#         make_request(
+#             JobKind.REPLACE_WL_SYMBOLS
+#         )
+#     )
+
+#     explicit_wl_export = dispatcher.execute(
+#         make_request(
+#             JobKind.EXPORT_WL
+#         )
+#     )
+
+#     assert replacement.message == (
+#         "replacement executed"
+#     )
+#     assert explicit_wl_export.message == (
+#         "WL export executed"
+#     )
+#     assert executor.calls == [
+#         "replace_wl_symbols",
+#         "export_wl",
+#         "export_wl",
+#     ]
+
+#     resumed = dispatcher.execute(
+#         make_request(
+#             JobKind.RESUME_EXPORTS
+#         )
+#     )
+#     completed_export = (
+#         dispatcher.execute(
+#             make_request(
+#                 JobKind.EXPORT_WL
+#             )
+#         )
+#     )
+
+#     assert resumed.ok is True
+#     assert flags.exports_suspended is False
+#     assert gate.is_suspended() is False
+#     assert completed_export.message == (
+#         "WL export executed"
+#     )
+#     assert executor.calls == [
+#         "replace_wl_symbols",
+#         "export_wl",
+#     ]
+
+
+def test_suspension_allows_watchlist_update_and_explicit_wl_export(
     tmp_path: Path,
 ) -> None:
     gate = ExportGate(tmp_path)
@@ -148,7 +221,8 @@ def test_suspension_blocks_exports_but_allows_watchlist_update(
             JobKind.REPLACE_WL_SYMBOLS
         )
     )
-    blocked_export = dispatcher.execute(
+
+    explicit_wl_export = dispatcher.execute(
         make_request(
             JobKind.EXPORT_WL
         )
@@ -157,12 +231,12 @@ def test_suspension_blocks_exports_but_allows_watchlist_update(
     assert replacement.message == (
         "replacement executed"
     )
-    assert blocked_export.message == (
-        "Skipped because scheduled exports "
-        "are suspended."
+    assert explicit_wl_export.message == (
+        "WL export executed"
     )
     assert executor.calls == [
-        "replace_wl_symbols"
+        "replace_wl_symbols",
+        "export_wl",
     ]
 
     resumed = dispatcher.execute(
@@ -170,11 +244,10 @@ def test_suspension_blocks_exports_but_allows_watchlist_update(
             JobKind.RESUME_EXPORTS
         )
     )
-    completed_export = (
-        dispatcher.execute(
-            make_request(
-                JobKind.EXPORT_WL
-            )
+
+    completed_export = dispatcher.execute(
+        make_request(
+            JobKind.EXPORT_WL
         )
     )
 
@@ -187,8 +260,9 @@ def test_suspension_blocks_exports_but_allows_watchlist_update(
     assert executor.calls == [
         "replace_wl_symbols",
         "export_wl",
+        "export_wl",
     ]
-
+    
 
 def test_hard_pause_remains_independent_from_export_suspension(
     tmp_path: Path,
