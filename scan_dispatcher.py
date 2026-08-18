@@ -260,17 +260,29 @@ class ScanDispatcher:
             .add_wl_symbols(request)
         )
 
+    # def _handle_export_wl(
+    #     self,
+    #     request: JobRequest,
+    # ) -> JobResult:
+    #     if self.flags.exports_suspended:
+    #         return (
+    #             self._skipped_exports_suspended(
+    #                 request
+    #             )
+    #         )
+
+    #     if not self._can_run_work(request):
+    #         return self._skipped_not_running(
+    #             request
+    #         )
+
+    #     return self.action_executor.export_wl(
+    #         request
+    #     )
     def _handle_export_wl(
         self,
         request: JobRequest,
     ) -> JobResult:
-        if self.flags.exports_suspended:
-            return (
-                self._skipped_exports_suspended(
-                    request
-                )
-            )
-
         if not self._can_run_work(request):
             return self._skipped_not_running(
                 request
