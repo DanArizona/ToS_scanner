@@ -348,6 +348,7 @@ def main(
     action_executor = ToSScanActionExecutor(
         action_controller=controller,
         output_dir=cfg.scans_path,
+        lan_scans_dir=cfg.lan_scans_path,
         logger=logger,
         dry_run=False,
     )

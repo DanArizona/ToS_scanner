@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from pathlib import Path
 from typing import Protocol
 import time
@@ -72,12 +73,18 @@ class ToSScanActionExecutor(NoOpScanActionExecutor):
         *,
         action_controller: ToSExportController | None,
         output_dir: Path,
+        lan_scans_dir: Path | None = None,
         logger: logging.Logger | None = None,
         dry_run: bool = False,
     ) -> None:
         super().__init__(logger=logger)
         self.action_controller = action_controller
         self.output_dir = Path(output_dir)
+        self.lan_scans_dir = (
+            Path(lan_scans_dir)
+            if lan_scans_dir is not None
+            else None
+        )
         self.dry_run = dry_run
 
     def _wait_for_output_file(self, output_path: Path, *, timeout_s: float) -> bool:
@@ -252,8 +259,25 @@ class ToSScanActionExecutor(NoOpScanActionExecutor):
 
         try:
             self._export_wl_with_existing_controller(output_path)
+
             if not self._wait_for_output_file(output_path, timeout_s=5.0):
-                raise RuntimeError(f"WL export file did not appear: {output_path}")
+                raise RuntimeError(
+                    f"WL export file did not appear: {output_path}"
+                )
+
+            if (
+                request.target_filename is not None
+                and self.lan_scans_dir is not None
+            ):
+                verification_dir = self.lan_scans_dir / "watchlist_verify"
+                verification_dir.mkdir(parents=True, exist_ok=True)
+
+                verification_path = verification_dir / output_path.name
+                shutil.copy2(output_path, verification_path)
+
+                self._log_info(
+                    f"Copied WL verification CSV to {verification_path}"
+                )
 
         except Exception as exc:
             message = f"WL export failed: {exc}"
