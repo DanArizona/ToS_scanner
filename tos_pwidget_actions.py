@@ -1000,11 +1000,147 @@ class ToSActionsController:
 
             self._log("GUI | win_wl_symbols_import detected")
 
-    def _apply_watchlist_symbols_from_clipboard(self, *, mode: str) -> None:
+    def _radio_button_is_selected(
+        self,
+        widget_name: str,
+        *,
+        center_x_px: int = 8,
+        patch_radius_px: int = 1,
+        min_mean_gray: float = 80.0,
+    ) -> bool:
         """
-        Apply symbols already on the clipboard in the symbols import dialog.
+        Visually determine whether a ThinkOrSwim radio button is selected.
+
+        The pwidget region includes the radio indicator at its left edge.
+        We inspect a small patch at the center of that indicator.
+
+        On the current ToS dark theme, a selected indicator has a bright
+        center dot, while an unselected indicator has a dark center.
+        """
+        widget = self._widget(widget_name)
+        x, y = widget.get_absolute_position()
+        w = int(widget.bbox.width)
+        h = int(widget.bbox.height)
+
+        if w <= 0 or h <= 0:
+            raise RuntimeError(
+                f"Invalid radio-button region for {widget_name!r}: "
+                f"{w}x{h}"
+            )
+
+        screenshot = pyautogui.screenshot(
+            region=(x, y, w, h)
+        )
+        gray = screenshot.convert("L")
+        arr = np.array(gray, dtype=np.uint8)
+
+        cx = min(center_x_px, w - 1)
+        cy = h // 2
+        r = patch_radius_px
+
+        x0 = max(0, cx - r)
+        x1 = min(w, cx + r + 1)
+        y0 = max(0, cy - r)
+        y1 = min(h, cy + r + 1)
+
+        patch = arr[y0:y1, x0:x1]
+        if patch.size == 0:
+            raise RuntimeError(
+                f"Could not sample radio-button center for "
+                f"{widget_name!r}."
+            )
+
+        mean_gray = float(np.mean(patch))
+        selected = mean_gray >= min_mean_gray
+
+        self._log(
+            "CHECK | radio %s center_mean=%.1f "
+            "threshold=%.1f selected=%s",
+            widget_name,
+            mean_gray,
+            min_mean_gray,
+            selected,
+        )
+
+        return selected
+
+    def _ensure_radio_button_selected(
+        self,
+        widget_name: str,
+        *,
+        opposite_widget_name: str | None = None,
+        attempts: int = 3,
+        settle_s: float = 0.20,
+    ) -> None:
+        """
+        Click and verify a ThinkOrSwim radio-button selection.
+
+        If opposite_widget_name is supplied, require the requested radio
+        button to be selected and the opposite radio button to be unselected.
+
+        Failure is deliberately fail-safe: raise before any destructive
+        confirmation button can be clicked.
+        """
+        if attempts <= 0:
+            raise ValueError(
+                "Radio-button verification attempts must be positive."
+            )
+
+        for attempt in range(1, attempts + 1):
+            self._move_center(widget_name)
+            self._click()
+            time.sleep(settle_s)
+
+            selected = self._radio_button_is_selected(
+                widget_name
+            )
+
+            opposite_selected = False
+            if opposite_widget_name is not None:
+                opposite_selected = (
+                    self._radio_button_is_selected(
+                        opposite_widget_name
+                    )
+                )
+
+            if selected and not opposite_selected:
+                self._log(
+                    "CHECK | radio selection verified -> %s "
+                    "attempt=%d",
+                    widget_name,
+                    attempt,
+                )
+                return
+
+            self._log(
+                "CHECK | radio selection NOT verified -> %s "
+                "attempt=%d/%d selected=%s "
+                "opposite=%s",
+                widget_name,
+                attempt,
+                attempts,
+                selected,
+                opposite_selected,
+            )
+
+        raise RuntimeError(
+            "Could not verify requested radio-button selection "
+            f"for {widget_name!r}; refusing to continue."
+        )
+
+    def _apply_watchlist_symbols_from_clipboard(
+        self,
+        *,
+        mode: str,
+    ) -> None:
+        """
+        Apply symbols already on the clipboard in the Symbols Import dialog.
 
         mode must be either "replace" or "add".
+
+        Safety rule:
+        Never click OK unless both the clipboard-source radio button and
+        requested Add/Replace mode have been visually verified.
         """
         if mode not in {"replace", "add"}:
             raise ValueError(
@@ -1016,21 +1152,34 @@ class ToSActionsController:
             "add": "rbutt_si_add",
         }[mode]
 
+        opposite_mode_widget = {
+            "replace": "rbutt_si_add",
+            "add": "rbutt_si_replace",
+        }[mode]
+
         self._log(
             "ACTION | apply_watchlist_symbols_from_clipboard -> %s",
             mode,
         )
-        self._bring_named_window_to_front("win_wl_symbols_import")
+        self._bring_named_window_to_front(
+            "win_wl_symbols_import"
+        )
 
-        # First load the clipboard symbols into the dialog.
-        self._move_center("rbutt_si_paste")
-        self._click()
+        # Select and VERIFY clipboard input before proceeding.
+        self._ensure_radio_button_selected(
+            "rbutt_si_paste",
+            opposite_widget_name="rbutt_si_file",
+        )
 
-        # Then select whether the imported symbols replace or augment
-        # the current Watchlist.
-        self._move_center(mode_widget)
-        self._click()
 
+        # Select and VERIFY Add/Replace mode before allowing OK.
+        # Require the opposite mode to be visibly unselected.
+        self._ensure_radio_button_selected(
+            mode_widget,
+            opposite_widget_name=opposite_mode_widget,
+        )
+
+        # Reaching this point means both safety checks succeeded.
         self._move_vh("btn_si_save")
         self._click()
 
