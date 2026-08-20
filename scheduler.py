@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 ET = ZoneInfo("America/New_York")
 SLOT_SECONDS = (5, 20, 35, 50)
-MARKET_OPEN = dt_time(9, 28, 0)
+MARKET_OPEN = dt_time(9, 24, 0)
 MARKET_CLOSE = dt_time(16, 2, 0)
 
 
