@@ -85,10 +85,18 @@ class ScanControlPanel(QWidget):
         self.hotkey_listener.start()
 
         self.setWindowTitle("JTM Scan Manager")
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        # self.resize(340, 460)
-        self.resize(430, 540)
-        self.move(20, 20)
+
+        # Do not keep this control panel above ThinkOrSwim windows.
+        # ToS automation must be able to bring its target windows/dialogs
+        # completely in front of this panel.
+        self.resize(270, 600)
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            self.move(
+                available.left() + 5,
+                available.bottom() - self.height() - 35,
+            )
 
         self._build_ui()
         self._apply_dark_theme()
@@ -104,12 +112,12 @@ class ScanControlPanel(QWidget):
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(16, 14, 16, 14)
-        outer.setSpacing(12)
+        outer.setContentsMargins(8, 6, 8, 6)
+        outer.setSpacing(6)
 
         title_label = QLabel("JTM Scan Manager")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_font = QFont("Arial Black", 16)
+        title_font = QFont("Arial Black", 13)
         title_font.setBold(True)
         title_label.setFont(title_font)
         outer.addWidget(title_label)
@@ -117,10 +125,6 @@ class ScanControlPanel(QWidget):
         file_label = QLabel(Path(__file__).name)
         file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         outer.addWidget(file_label)
-
-        top_row = QHBoxLayout()
-        top_row.setSpacing(16)
-        outer.addLayout(top_row)
 
         mode_group = QGroupBox("Mode")
         mode_layout = QVBoxLayout(mode_group)
@@ -140,38 +144,53 @@ class ScanControlPanel(QWidget):
         mode_layout.addWidget(self.radio_debug)
 
         self.notify_checkbox = QCheckBox("Pushover notifications")
-        self.notify_checkbox.setChecked(bool(self.manager.notifications_enabled))
-        self.notify_checkbox.toggled.connect(self.on_notify_toggled)
+        self.notify_checkbox.setChecked(
+            bool(self.manager.notifications_enabled)
+        )
+        self.notify_checkbox.toggled.connect(
+            self.on_notify_toggled
+        )
         mode_layout.addWidget(self.notify_checkbox)
 
-        top_row.addWidget(mode_group, stretch=0)
-
-        maint_col = QVBoxLayout()
-        maint_col.setSpacing(10)
-        top_row.addLayout(maint_col, stretch=1)
+        outer.addWidget(mode_group)
 
         self.manual_init_btn = QPushButton("Manual init")
-        self.manual_init_btn.clicked.connect(self.on_manual_init_clicked)
-        maint_col.addWidget(self.manual_init_btn)
+        self.manual_init_btn.clicked.connect(
+            self.on_manual_init_clicked
+        )
 
         self.unlock_scan_btn = QPushButton("Unlock scan")
-        self.unlock_scan_btn.clicked.connect(self.on_unlock_scan_clicked)
-        maint_col.addWidget(self.unlock_scan_btn)
+        self.unlock_scan_btn.clicked.connect(
+            self.on_unlock_scan_clicked
+        )
 
         self.scan_btn = QPushButton("Press ToS Scan")
         self.scan_btn.clicked.connect(self.on_scan_clicked)
-        maint_col.addWidget(self.scan_btn)
 
-        self.scan_export_btn = QPushButton("Scan and Export CSV")
-        self.scan_export_btn.clicked.connect(self.on_scan_export_clicked)
-        maint_col.addWidget(self.scan_export_btn)
+        self.scan_export_btn = QPushButton(
+            "Scan and Export CSV"
+        )
+        self.scan_export_btn.clicked.connect(
+            self.on_scan_export_clicked
+        )
 
+        maint_row1 = QHBoxLayout()
+        maint_row1.setSpacing(6)
+        maint_row1.addWidget(self.manual_init_btn)
+        maint_row1.addWidget(self.unlock_scan_btn)
+        outer.addLayout(maint_row1)
+
+        maint_row2 = QHBoxLayout()
+        maint_row2.setSpacing(6)
+        maint_row2.addWidget(self.scan_btn)
+        maint_row2.addWidget(self.scan_export_btn)
+        outer.addLayout(maint_row2)
 
         # -------------------- start of output-directory group --------------------
 
         output_group = QGroupBox("Output directory")
         output_layout = QVBoxLayout(output_group)
-        output_layout.setSpacing(8)
+        output_layout.setSpacing(4)
 
         self.output_dir_edit = QLineEdit(str(self.manager.get_output_dir()))
         self.output_dir_edit.setToolTip("Directory where scan CSV files will be saved.")
@@ -189,7 +208,7 @@ class ScanControlPanel(QWidget):
         self.output_apply_btn.clicked.connect(self.on_output_apply_clicked)
         output_button_row.addWidget(self.output_apply_btn)
 
-        output_hint = QLabel("Apply, then run Manual init before starting the scan loop.")
+        output_hint = QLabel("Apply, then Manual init before Start Scan.")
         output_hint.setWordWrap(True)
         output_layout.addWidget(output_hint)
 
@@ -203,8 +222,8 @@ class ScanControlPanel(QWidget):
         outer.addWidget(line1)
 
         status_grid = QGridLayout()
-        status_grid.setHorizontalSpacing(16)
-        status_grid.setVerticalSpacing(10)
+        status_grid.setHorizontalSpacing(10)
+        status_grid.setVerticalSpacing(5)
         outer.addLayout(status_grid)
 
         status_grid.addWidget(QLabel("Market status"), 0, 0)
@@ -234,10 +253,16 @@ class ScanControlPanel(QWidget):
         self.stop_btn.clicked.connect(self.on_stop_clicked)
         control_row.addWidget(self.stop_btn)
 
-        # esc_note = QLabel("ESC also requests\n a graceful stop")
-        esc_note = QLabel("ESC Stop\nCtrl+Alt+E Export\nCtrl+Alt+Q Exit")
-        esc_note.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        control_row.addWidget(esc_note)
+        esc_note = QLabel(
+            "ESC Stop    "
+            "Ctrl+Alt+E Export    "
+            "Ctrl+Alt+Q Exit"
+        )
+        esc_note.setWordWrap(True)
+        esc_note.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        outer.addWidget(esc_note)
 
         line2 = QFrame()
         line2.setFrameShape(QFrame.Shape.HLine)
@@ -254,7 +279,7 @@ class ScanControlPanel(QWidget):
             QWidget {
                 background-color: #1f1f1f;
                 color: #f2f2f2;
-                font-size: 11pt;
+                font-size: 9pt;
             }
 
             QLabel {
@@ -266,7 +291,7 @@ class ScanControlPanel(QWidget):
                 border-radius: 4px;
                 margin-top: 10px;
                 padding-top: 10px;
-                font-size: 10pt;
+                font-size: 9pt;
                 color: #f2f2f2;
             }
 
@@ -281,7 +306,7 @@ class ScanControlPanel(QWidget):
                 color: #f2f2f2;
                 border: 1px solid #666666;
                 border-radius: 4px;
-                padding: 6px 10px;
+                padding: 4px 6px;
                 min-width: 88px;
             }
 
