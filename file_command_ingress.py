@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -29,6 +30,8 @@ _SOURCE_KIND_BY_TEXT: dict[str, SourceKind] = {
 } | {
     kind.name.lower(): kind for kind in SourceKind
 }
+PROCESSING_READ_RETRY_SECONDS = 5.0
+PROCESSING_READ_RETRY_INTERVAL_SECONDS = 0.1
 
 
 @dataclass
@@ -105,7 +108,9 @@ class FileCommandIngress:
                 continue
 
             try:
-                request = self._parse_command_file(processing_path)
+                request = self._parse_command_file_with_retry(
+                    processing_path
+                )
 
                 job_queue.submit(request)
 
@@ -155,6 +160,44 @@ class FileCommandIngress:
         error_path.write_text(str(exc), encoding="utf-8")
 
         return target_path
+
+    def _parse_command_file_with_retry(
+        self,
+        path: Path,
+    ) -> JobRequest:
+        """
+        Parse a claimed command file, retrying transient
+        PermissionError failures.
+
+        On Windows/SMB, a file may be successfully moved
+        from incoming/ to processing/ but remain briefly
+        unavailable for reading.
+        """
+
+        deadline = (
+            time.monotonic()
+            + PROCESSING_READ_RETRY_SECONDS
+        )
+
+        while True:
+            try:
+                return self._parse_command_file(path)
+
+            except PermissionError as exc:
+                if time.monotonic() >= deadline:
+                    raise
+
+                self._log_info(
+                    "Command file temporarily unavailable "
+                    "after move to processing; retrying: "
+                    "%s (%s)",
+                    path.name,
+                    exc,
+                )
+
+                time.sleep(
+                    PROCESSING_READ_RETRY_INTERVAL_SECONDS
+                )
 
     def _parse_command_file(self, path: Path) -> JobRequest:
         try:
