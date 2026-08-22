@@ -128,6 +128,10 @@ class ScannerHeartbeatPublisher:
         shutdown_requested: bool,
         loop_state: str,
         exports_suspended: bool = False,
+        exports_suspended_since_utc: str | None = None,
+        suspension_age_seconds: float | None = None,
+        suspension_command_id: str | None = None,
+        state_health: str = "NORMAL",
         current_job: JobRequest | None = None,
         last_result: JobResult | None = None,
         force: bool = False,
@@ -183,6 +187,16 @@ class ScannerHeartbeatPublisher:
             "exports_suspended": (
                 exports_suspended
             ),
+            "exports_suspended_since_utc": (
+                exports_suspended_since_utc
+            ),
+            "suspension_age_seconds": (
+                suspension_age_seconds
+            ),
+            "suspension_command_id": (
+                suspension_command_id
+            ),
+            "state_health": state_health,
             "shutdown_requested": (
                 shutdown_requested
             ),
