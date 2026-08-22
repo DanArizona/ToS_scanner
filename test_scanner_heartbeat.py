@@ -53,6 +53,26 @@ def test_publish_creates_heartbeat_file(
     assert payload["application"] == "ToS_scanner"
     assert payload["heartbeat_sequence"] == 1
     assert payload["loop_state"] == "idle"
+    assert (
+        payload["exports_suspended"]
+        is False
+    )
+    assert (
+        payload["exports_suspended_since_utc"]
+        is None
+    )
+    assert (
+        payload["suspension_age_seconds"]
+        is None
+    )
+    assert (
+        payload["suspension_command_id"]
+        is None
+    )
+    assert (
+        payload["state_health"]
+        == "NORMAL"
+    )
     assert payload["running"] is True
     assert payload["paused"] is False
     assert payload["shutdown_requested"] is False
@@ -60,6 +80,58 @@ def test_publish_creates_heartbeat_file(
     assert payload["last_job"] is None
     assert isinstance(payload["pid"], int)
     assert payload["heartbeat_at_utc"].endswith("Z")
+
+
+def test_publish_includes_export_suspension_metadata(
+    tmp_path: Path,
+) -> None:
+    publisher = ScannerHeartbeatPublisher(
+        command_root=tmp_path,
+    )
+
+    publisher.publish(
+        running=True,
+        paused=False,
+        shutdown_requested=False,
+        loop_state="exports_suspended",
+        exports_suspended=True,
+        exports_suspended_since_utc=(
+            "2026-08-21T15:01:26Z"
+        ),
+        suspension_age_seconds=187.5,
+        suspension_command_id=(
+            "mb-suspend_exports-test"
+        ),
+        state_health="DEGRADED",
+        force=True,
+    )
+
+    payload = json.loads(
+        publisher.heartbeat_path.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert (
+        payload["exports_suspended"]
+        is True
+    )
+    assert (
+        payload["exports_suspended_since_utc"]
+        == "2026-08-21T15:01:26Z"
+    )
+    assert (
+        payload["suspension_age_seconds"]
+        == 187.5
+    )
+    assert (
+        payload["suspension_command_id"]
+        == "mb-suspend_exports-test"
+    )
+    assert (
+        payload["state_health"]
+        == "DEGRADED"
+    )
 
 
 def test_publish_includes_current_job_and_last_result(

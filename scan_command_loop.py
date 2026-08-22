@@ -8,6 +8,7 @@ import os
 import threading
 import time
 from collections.abc import Sequence
+from datetime import datetime, timezone
 from pathlib import Path
 
 from config import load_scanner_config
@@ -121,6 +122,116 @@ def build_logger() -> logging.Logger:
     return logger
 
 
+SUSPENSION_WARNING_SECONDS = 60.0
+SUSPENSION_DEGRADED_SECONDS = 120.0
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _parse_utc_text(
+    value: str,
+) -> datetime:
+    parsed = datetime.fromisoformat(
+        value.replace("Z", "+00:00")
+    )
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(
+            tzinfo=timezone.utc
+        )
+
+    return parsed.astimezone(
+        timezone.utc
+    )
+
+
+def _suspension_heartbeat_metadata(
+    export_gate: ExportGate | None,
+    *,
+    exports_suspended: bool,
+) -> tuple[
+    str | None,
+    float | None,
+    str | None,
+    str,
+]:
+    if (
+        not exports_suspended
+        or export_gate is None
+    ):
+        return (
+            None,
+            None,
+            None,
+            "NORMAL",
+        )
+
+    snapshot = export_gate.snapshot()
+
+    if not snapshot.suspended:
+        return (
+            None,
+            None,
+            None,
+            "NORMAL",
+        )
+
+    suspended_since = (
+        snapshot.updated_at_utc
+    )
+    command_id = snapshot.command_id
+
+    if suspended_since is None:
+        return (
+            None,
+            None,
+            command_id,
+            "DEGRADED",
+        )
+
+    try:
+        suspended_at = _parse_utc_text(
+            suspended_since
+        )
+    except ValueError:
+        return (
+            suspended_since,
+            None,
+            command_id,
+            "DEGRADED",
+        )
+
+    age_seconds = max(
+        0.0,
+        (
+            _utc_now()
+            - suspended_at
+        ).total_seconds(),
+    )
+
+    if (
+        age_seconds
+        >= SUSPENSION_DEGRADED_SECONDS
+    ):
+        state_health = "DEGRADED"
+    elif (
+        age_seconds
+        >= SUSPENSION_WARNING_SECONDS
+    ):
+        state_health = "WARNING"
+    else:
+        state_health = "NORMAL"
+
+    return (
+        suspended_since,
+        age_seconds,
+        command_id,
+        state_health,
+    )
+
+
 def _load_runtime_flags(
     export_gate: ExportGate,
     logger: logging.Logger,
@@ -162,11 +273,24 @@ def _publish_heartbeat(
     heartbeat: ScannerHeartbeatPublisher,
     flags: ScanRuntimeFlags,
     loop_state: str,
+    export_gate: ExportGate | None = None,
     current_job=None,
     last_result: JobResult | None = None,
     force: bool = False,
 ) -> bool:
     """Publish current command-loop state consistently."""
+
+    (
+        exports_suspended_since_utc,
+        suspension_age_seconds,
+        suspension_command_id,
+        state_health,
+    ) = _suspension_heartbeat_metadata(
+        export_gate,
+        exports_suspended=(
+            flags.exports_suspended
+        ),
+    )
 
     return heartbeat.publish(
         running=flags.running,
@@ -174,6 +298,16 @@ def _publish_heartbeat(
         exports_suspended=(
             flags.exports_suspended
         ),
+        exports_suspended_since_utc=(
+            exports_suspended_since_utc
+        ),
+        suspension_age_seconds=(
+            suspension_age_seconds
+        ),
+        suspension_command_id=(
+            suspension_command_id
+        ),
+        state_health=state_health,
         shutdown_requested=(
             flags.shutdown_requested
         ),
@@ -189,6 +323,7 @@ def _wait_for_operator(
     heartbeat: ScannerHeartbeatPublisher,
     flags: ScanRuntimeFlags,
     last_result: JobResult | None,
+    export_gate: ExportGate | None = None,
     refresh_poll_s: float = 0.5,
 ) -> None:
     """
@@ -202,6 +337,7 @@ def _wait_for_operator(
 
     _publish_heartbeat(
         heartbeat=heartbeat,
+        export_gate=export_gate,
         flags=flags,
         loop_state="waiting_for_operator",
         last_result=last_result,
@@ -214,6 +350,7 @@ def _wait_for_operator(
         ):
             _publish_heartbeat(
                 heartbeat=heartbeat,
+                export_gate=export_gate,
                 flags=flags,
                 loop_state=(
                     "waiting_for_operator"
@@ -259,6 +396,7 @@ def _publish_stopped_heartbeat(
     heartbeat: ScannerHeartbeatPublisher,
     flags: ScanRuntimeFlags,
     last_result: JobResult | None,
+    export_gate: ExportGate | None = None,
 ) -> None:
     """Publish a consistent final stopped state."""
 
@@ -268,6 +406,7 @@ def _publish_stopped_heartbeat(
 
     _publish_heartbeat(
         heartbeat=heartbeat,
+        export_gate=export_gate,
         flags=flags,
         loop_state="stopped",
         current_job=None,
@@ -317,6 +456,7 @@ def main(
             heartbeat=heartbeat,
             flags=flags,
             last_result=last_result,
+            export_gate=export_gate,
         )
     except KeyboardInterrupt:
         logger.info(
@@ -327,6 +467,7 @@ def main(
         try:
             _publish_stopped_heartbeat(
                 heartbeat=heartbeat,
+                export_gate=export_gate,
                 flags=flags,
                 last_result=last_result,
             )
@@ -379,6 +520,7 @@ def main(
 
     _publish_heartbeat(
         heartbeat=heartbeat,
+        export_gate=export_gate,
         flags=flags,
         loop_state=_loop_state(flags),
         last_result=last_result,
@@ -389,6 +531,7 @@ def main(
         while not flags.shutdown_requested:
             _publish_heartbeat(
                 heartbeat=heartbeat,
+                export_gate=export_gate,
                 flags=flags,
                 loop_state=_loop_state(flags),
                 last_result=last_result,
@@ -416,6 +559,7 @@ def main(
 
                 _publish_heartbeat(
                     heartbeat=heartbeat,
+                    export_gate=export_gate,
                     flags=flags,
                     loop_state="busy",
                     current_job=job,
@@ -484,6 +628,7 @@ def main(
 
                     _publish_heartbeat(
                         heartbeat=heartbeat,
+                        export_gate=export_gate,
                         flags=flags,
                         loop_state=(
                             _loop_state(flags)
@@ -512,6 +657,7 @@ def main(
         try:
             _publish_stopped_heartbeat(
                 heartbeat=heartbeat,
+                export_gate=export_gate,
                 flags=flags,
                 last_result=last_result,
             )
