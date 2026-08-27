@@ -73,18 +73,18 @@ class ToSScanActionExecutor(NoOpScanActionExecutor):
         *,
         action_controller: ToSExportController | None,
         output_dir: Path,
-        lan_scans_dir: Path | None = None,
+        verification_outbox_dir: Path | None = None,        
         logger: logging.Logger | None = None,
         dry_run: bool = False,
     ) -> None:
         super().__init__(logger=logger)
         self.action_controller = action_controller
         self.output_dir = Path(output_dir)
-        self.lan_scans_dir = (
-            Path(lan_scans_dir)
-            if lan_scans_dir is not None
+        self.verification_outbox_dir = (
+            Path(verification_outbox_dir)
+            if verification_outbox_dir is not None
             else None
-        )
+        )        
         self.dry_run = dry_run
 
     def _wait_for_output_file(self, output_path: Path, *, timeout_s: float) -> bool:
@@ -267,16 +267,34 @@ class ToSScanActionExecutor(NoOpScanActionExecutor):
 
             if (
                 request.target_filename is not None
-                and self.lan_scans_dir is not None
+                and self.verification_outbox_dir is not None
             ):
-                verification_dir = self.lan_scans_dir / "watchlist_verify"
-                verification_dir.mkdir(parents=True, exist_ok=True)
+                self.verification_outbox_dir.mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
 
-                verification_path = verification_dir / output_path.name
-                shutil.copy2(output_path, verification_path)
+                staged_path = (
+                    self.verification_outbox_dir
+                    / output_path.name
+                )
+
+                temp_path = staged_path.with_name(
+                    staged_path.name + ".tmp"
+                )
+
+                shutil.copy2(
+                    output_path,
+                    temp_path,
+                )
+
+                temp_path.replace(
+                    staged_path
+                )
 
                 self._log_info(
-                    f"Copied WL verification CSV to {verification_path}"
+                    "Staged WL verification CSV "
+                    f"to local outbox {staged_path}"
                 )
 
         except Exception as exc:

@@ -244,17 +244,89 @@ def test_add_wl_symbols_uses_singular_word_for_one_symbol(
     assert controller.replace_calls == []
 
 
-def test_export_wl_with_target_filename_copies_verification_csv(
+# def test_export_wl_with_target_filename_copies_verification_csv(
+#     tmp_path: Path,
+#     monkeypatch: pytest.MonkeyPatch,
+# ) -> None:
+#     output_dir = tmp_path / "local_scans"
+#     lan_scans_dir = tmp_path / "lan_scans"
+
+#     executor = ToSScanActionExecutor(
+#         action_controller=None,
+#         output_dir=output_dir,
+#         lan_scans_dir=lan_scans_dir,
+#     )
+
+#     request = make_request(
+#         kind=JobKind.EXPORT_WL,
+#         target_filename="objective2-test-WL.csv",
+#     )
+
+#     def fake_export(output_path: Path) -> None:
+#         output_path.parent.mkdir(
+#             parents=True,
+#             exist_ok=True,
+#         )
+#         output_path.write_text(
+#             "Symbol,Value\n"
+#             "NVDA,1\n"
+#             "TSLA,2\n",
+#             encoding="utf-8",
+#         )
+
+#     monkeypatch.setattr(
+#         executor,
+#         "_export_wl_with_existing_controller",
+#         fake_export,
+#     )
+
+#     result = executor.export_wl(request)
+
+#     local_path = (
+#         output_dir
+#         / "objective2-test-WL.csv"
+#     )
+#     verification_path = (
+#         lan_scans_dir
+#         / "watchlist_verify"
+#         / "objective2-test-WL.csv"
+#     )
+
+#     assert result.ok is True
+#     assert result.error is None
+
+#     assert local_path.exists()
+#     assert verification_path.exists()
+
+#     assert (
+#         verification_path.read_text(
+#             encoding="utf-8"
+#         )
+#         == local_path.read_text(
+#             encoding="utf-8"
+#         )
+#     )
+
+
+def test_export_wl_with_target_filename_stages_verification_csv(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output_dir = tmp_path / "local_scans"
-    lan_scans_dir = tmp_path / "lan_scans"
+
+    verification_outbox_dir = (
+        tmp_path
+        / "command_root"
+        / "outgoing"
+        / "watchlist_verify"
+    )
 
     executor = ToSScanActionExecutor(
         action_controller=None,
         output_dir=output_dir,
-        lan_scans_dir=lan_scans_dir,
+        verification_outbox_dir=(
+            verification_outbox_dir
+        ),
     )
 
     request = make_request(
@@ -286,20 +358,25 @@ def test_export_wl_with_target_filename_copies_verification_csv(
         output_dir
         / "objective2-test-WL.csv"
     )
-    verification_path = (
-        lan_scans_dir
-        / "watchlist_verify"
+
+    staged_path = (
+        verification_outbox_dir
         / "objective2-test-WL.csv"
+    )
+
+    temp_path = staged_path.with_name(
+        staged_path.name + ".tmp"
     )
 
     assert result.ok is True
     assert result.error is None
 
     assert local_path.exists()
-    assert verification_path.exists()
+    assert staged_path.exists()
+    assert not temp_path.exists()
 
     assert (
-        verification_path.read_text(
+        staged_path.read_text(
             encoding="utf-8"
         )
         == local_path.read_text(
