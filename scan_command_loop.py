@@ -489,7 +489,11 @@ def main(
     action_executor = ToSScanActionExecutor(
         action_controller=controller,
         output_dir=cfg.scans_path,
-        lan_scans_dir=cfg.lan_scans_path,
+        verification_outbox_dir=(
+            command_root
+            / "outgoing"
+            / "watchlist_verify"
+        ),
         logger=logger,
         dry_run=False,
     )
