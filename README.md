@@ -1,78 +1,274 @@
 # ToS_scanner
 
-`ToS_scanner` automates selected ThinkOrSwim scanner and Watchlist workflows using pseudo-widget coordinates defined in an external YAML layout file.
+ThinkOrSwim GUI automation, scheduled CSV export, and remote Watchlist-control services for the MasterBot project.
 
-The current v2 development work is centered on a file-based command loop that runs on the ThinkOrSwim computer and accepts commands from another computer on the local network.
+> **Development status:** Active proof of concept on branch `scan_main_v2p0dev0`.
+>
+> The current POC uses two El-Cheapo Python processes:
+>
+> * `scan_main_v2p0dev0.py` — the scanner/control-panel application and scheduled export process;
+> * `scan_command_loop.py` — the MasterBot command/control sidecar.
+>
+> ThinkOrSwim itself must also be running with the expected scanner and Watchlist windows.
 
-## Current entry points
+## Purpose
 
-### V2 command loop
+`ToS_scanner` is the El-Cheapo-side ThinkOrSwim automation layer.
 
-The current v2 command-loop entry point is:
+It performs GUI-driven operations that currently cannot be delegated directly to an API, including:
+
+* scheduled ThinkOrSwim scanner exports;
+* scheduled Watchlist exports;
+* explicit Watchlist exports requested by MasterBot;
+* replacement of Watchlist membership;
+* addition of Watchlist symbols;
+* temporary suspension of scheduled exports while MasterBot performs protected Watchlist reconciliation.
+
+The project is one component of a larger MasterBot architecture.
+
+Current high-level flow:
+
+```text
+MasterBot
+   |
+   |  \\El-Cheapo\SCANCTRL
+   v
+scan_command_loop.py
+   |
+   v
+ThinkOrSwim GUI
+
+scan_main_v2p0dev0.py
+   |
+   +--> scheduled WL exports
+   |
+   +--> scheduled scanner exports
+   |
+   v
+ThinkOrSwim GUI
+```
+
+For the current proof of concept, these remain separate processes.
+
+Long term, if the architecture proves successful, their responsibilities are expected to be merged into one El-Cheapo scanner service/process.
+
+---
+
+# Current POC operating model
+
+## El-Cheapo
+
+El-Cheapo currently runs:
+
+```text
+ThinkOrSwim
+scan_main_v2p0dev0.py
+scan_command_loop.py
+```
+
+The two Python programs have distinct responsibilities.
+
+### `scan_main_v2p0dev0.py`
+
+Current v2 scanner/control-panel entry point:
+
+```cmd
+python scan_main_v2p0dev0.py
+```
+
+This process creates the Qt scanner application and control panel and owns the scheduled scanner/export behavior.
+
+Its responsibilities include:
+
+* scanner control GUI;
+* scheduled ThinkOrSwim scanner exports;
+* scheduled Watchlist exports;
+* runtime scanner state used by the GUI application;
+* output-file generation through ThinkOrSwim automation.
+
+### `scan_command_loop.py`
+
+Remote command/control entry point:
 
 ```cmd
 python scan_command_loop.py
 ```
 
-This program:
+This process:
 
-* watches a command directory for JSON command files;
-* dispatches scanner and Watchlist actions;
-* controls ThinkOrSwim through pseudo-widget actions;
-* publishes a periodic scanner heartbeat;
-* reports runtime state such as running, paused, busy, or stopped.
+* watches the scanner-control directory for MasterBot commands;
+* dispatches explicit ThinkOrSwim actions;
+* handles Watchlist ADD and REPLACE requests;
+* handles explicit Watchlist exports;
+* implements the scheduled-export suspension gate;
+* publishes the scanner-command heartbeat consumed by `mb-scan-status`.
 
-### Legacy v1 GUI
+The two processes are separate for historical/development reasons.
 
-The earlier Qt control-panel entry point remains available:
+For the current POC this is accepted operationally rather than adding temporary lifecycle infrastructure.
+
+---
+
+# Important status limitation
+
+The heartbeat published under the scanner command root belongs to:
+
+```text
+scan_command_loop.py
+```
+
+Therefore:
 
 ```cmd
-python scan_main_v1p2.py
+mb-scan-status
 ```
 
-The v1 program provides scheduled scan exports, manual export controls, hotkeys, and queued logging. It remains useful, but current development on branch `scan_main_v2p0dev0` is focused on the v2 command architecture.
+primarily tells MasterBot that the **command-loop process** is alive and reports its logical runtime flags.
 
-## Related repositories
-
-This project uses several related repositories:
-
-* `mb_tools` — shared configuration, pseudo-widget, windowing, logging, scanner-command, and scanner-status utilities;
-* `pwidget_layouts` — shared pseudo-widget YAML layouts;
-* `ToS_gui_survey` — tools for inspecting and validating ThinkOrSwim pseudo-widget layouts.
-
-The scanner layout is normally selected through:
+For example:
 
 ```text
-MB_PWIDGET_YAML
+Scanner status : HEALTHY
+Loop state     : idle
+Running        : yes
+Paused         : no
 ```
 
-Current development layout:
+does **not** independently prove that:
 
 ```text
-C:\Users\DanLa\Documents\github\pwidget_layouts\layout_scanner3_v1p1dev2.yaml
+scan_main_v2p0dev0.py
 ```
 
-## Configuration
+is running.
 
-Scanner configuration uses the `mb_tools` precedence model:
+In the current POC, the operator manually ensures both El-Cheapo processes are running.
+
+Do not interpret:
 
 ```text
-project .env > Windows environment > mb_tools defaults.env
+Running : yes
 ```
 
-Important scanner values include:
+as process-level proof that `scan_main_v2p0dev0.py` is alive.
+
+This limitation is intentionally deferred because the long-term design is expected to merge the command loop and scanner application rather than add permanent coordination machinery between two processes that may eventually disappear.
+
+---
+
+# Long-term El-Cheapo direction
+
+If the MasterBot coordinator architecture proves successful, the preferred long-term architecture is:
+
+```text
+scan_main_v2p0dev0.py
+        +
+scan_command_loop.py
+        |
+        v
+one scanner service/process
+```
+
+Desired properties:
+
+* one process lifecycle;
+* one authoritative heartbeat/status;
+* one GUI-action arbiter;
+* one scheduled-export scheduler;
+* one remote command interface;
+* one shutdown/startup model.
+
+The current two-process architecture should be considered a POC/development arrangement rather than a final production design.
+
+---
+
+# Related projects
+
+`ToS_scanner` works with several MasterBot repositories.
+
+## mb_tools
+
+Provides shared functionality including:
+
+```text
+mb-scan-command
+mb-scan-status
+```
+
+as well as configuration, window-management, pseudo-widget, logging, and secure-configuration utilities.
+
+## mb_watchlist_coordinator
+
+Owns:
+
+* producer intents;
+* canonical Watchlist revisions;
+* adapter targets;
+* reconciliation;
+* transactions;
+* verification;
+* confirmed/observed adapter state.
+
+`ToS_scanner` is a downstream materialization mechanism for that architecture.
+
+## schwab_watchlists
+
+Currently hosts the live POC application layer including:
+
+* Overnight Volume producer;
+* Nasdaq LUDP/M producer;
+* live ToS coordinator executor;
+* protected observation/materialization;
+* Watchlist evidence transport;
+* `mb-wl-recovery`.
+
+## mb_market_data
+
+Provides reusable market-data acquisition including:
+
+* Nasdaq Trade Halt data;
+* Schwab quotes;
+* price-history probes;
+* ToS decision snapshots;
+* future historical Overnight Volume infrastructure.
+
+## pwidget_layouts
+
+Stores shared pseudo-widget YAML layouts used to locate ThinkOrSwim GUI elements.
+
+## ToS_gui_survey
+
+Used to inspect, measure, and validate ThinkOrSwim GUI geometry and pseudo-widget layouts.
+
+---
+
+# Configuration
+
+Scanner configuration follows the `mb_tools` precedence model:
+
+```text
+project .env
+    >
+Windows environment
+    >
+mb_tools defaults.env
+```
+
+Important variables include:
 
 ```text
 MB_PWIDGET_YAML
 MB_SCANS
 MB_LAN_SCANS
 MB_LOG_FOLDER
+MB_SCAN_CONTROL
 
 MB_WINDOW_TOS
 MB_WINDOW_TOS_MAIN
 MB_WINDOW_TOS_LOGON
 MB_WINDOW_TOS_UPDATE
 MB_WINDOW_TOS_EXPORT
+
 MB_WINDOW_TOS_WL_MAIN
 MB_WINDOW_TOS_WL_EXPORT_MATCH
 MB_WINDOW_TOS_WL_SYMBOLS
@@ -82,337 +278,288 @@ MB_WIN_MAIN_REF_WIDTH
 MB_WIN_MAIN_REF_HEIGHT
 ```
 
-Typical development values include:
+Typical ThinkOrSwim window values include:
 
 ```dotenv
 MB_WINDOW_TOS_MAIN=Main@thinkorswim
 MB_WINDOW_TOS_WL_MAIN=Watchlist Main@thinkorswim
 MB_WINDOW_TOS_WL_EXPORT_MATCH=Watchlist '
 MB_WINDOW_TOS_WL_SYMBOLS=Symbols Import
-
-MB_WIN_MAIN_REF_WIDTH=1190
-MB_WIN_MAIN_REF_HEIGHT=1080
-MB_WIN_ALL_MAX_DIMS_ERR=4
 ```
 
-Configured window names are treated as stable title prefixes. For example:
+Configured ThinkOrSwim window names are generally treated as title prefixes.
+
+For example:
 
 ```text
 Main@thinkorswim
 ```
 
-can match a changing title such as:
+may match a changing title such as:
 
 ```text
 Main@thinkorswim [build 1992]
 ```
 
-## V2 command architecture
+---
 
-The current development arrangement uses two Windows computers:
+# Pseudo-widget layout
 
-```text
-MasterBot   Sends scanner commands and reads scanner status
-El-Cheapo   Runs ThinkOrSwim and scan_command_loop.py
-```
-
-MasterBot reaches the command directory through:
+The ThinkOrSwim layout is normally selected using:
 
 ```text
-\\El-Cheapo\SCANCTRL
+MB_PWIDGET_YAML
 ```
 
-The corresponding local directory on El-Cheapo is currently:
+A development layout has historically been located under:
+
+```text
+C:\Users\DanLa\Documents\github\pwidget_layouts\
+```
+
+The exact active YAML file may change during development.
+
+GUI automation depends on:
+
+* expected windows being open;
+* expected dimensions;
+* expected relative locations;
+* correct pseudo-widget definitions.
+
+Use `ToS_gui_survey` and `pwidget_layouts` when GUI geometry needs to be revalidated.
+
+---
+
+# Scanner-control share
+
+The command loop normally uses the local El-Cheapo directory:
 
 ```text
 C:\Users\DanLa\Documents\github\stockScans_control
 ```
 
-The command root is resolved in this order:
-
-1. The `--root` command-line argument
-2. The `MB_SCAN_CONTROL` environment variable
-3. The local El-Cheapo development default:
-   `C:\Users\DanLa\Documents\github\stockScans_control`
-
-
-### Command-directory layout
-
-The command root contains:
+MasterBot accesses that directory through:
 
 ```text
-stockScans_control\
-    incoming\
-    processing\
-    processed\
-    failed\
-    status\
-        scanner_heartbeat.json
+\\El-Cheapo\SCANCTRL
 ```
 
-Directory purposes:
+On MasterBot:
 
-| Directory    | Purpose                                                |
-| ------------ | ------------------------------------------------------ |
-| `incoming`   | Newly published JSON commands                          |
-| `processing` | Commands currently being read and validated            |
-| `processed`  | Commands accepted and submitted to the job queue       |
-| `failed`     | Commands rejected because of parsing or ingress errors |
-| `status`     | Scanner heartbeat and runtime-status files             |
+```text
+MB_SCAN_CONTROL=\\El-Cheapo\SCANCTRL
+```
 
-Commands are published atomically as temporary files and then renamed to `.json`. The ingress process also retries transient Windows or SMB file-lock errors on a later poll.
+The command root is resolved in this order:
 
-## Starting the v2 command loop
+1. explicit `--root`;
+2. `MB_SCAN_CONTROL`;
+3. local El-Cheapo development default.
 
-Before starting:
+Example:
 
-1. Open the ThinkOrSwim Main scanner window.
-2. Open the ThinkOrSwim Watchlist window.
-3. Place the windows in the positions and dimensions expected by the configured YAML layout.
-4. Confirm the local command root is available.
-5. Confirm the MasterBot share points to the same command root.
+```cmd
+python scan_command_loop.py --root C:\Users\DanLa\Documents\github\stockScans_control
+```
 
-Start the loop from the repository root:
+---
+
+# Starting the current POC
+
+## 1. Start ThinkOrSwim
+
+Open the expected:
+
+* Main scanner window;
+* Watchlist window.
+
+Position them according to the active pseudo-widget layout.
+
+## 2. Start the scanner application
+
+From the `ToS_scanner` repository:
+
+```cmd
+python scan_main_v2p0dev0.py
+```
+
+## 3. Start the command loop
+
+In a second El-Cheapo console:
 
 ```cmd
 python scan_command_loop.py
 ```
 
-Use an explicit command root:
-
-```cmd
-python scan_command_loop.py --root C:\path\to\scanner-control
-```
-
-The program displays a setup checklist and waits at:
+The command loop displays an operator checklist and may wait at:
 
 ```text
 Press Enter when ready...
 ```
 
-While it is waiting, the heartbeat state is:
+During this period its heartbeat reports:
 
 ```text
 waiting_for_operator
 ```
 
-Press Enter to begin polling the command directory.
+Press Enter after the ThinkOrSwim windows are ready.
 
-The loop can be stopped by:
+## 4. Mark the command-loop runtime as running
 
-* sending a `stop` command from MasterBot; or
-* pressing `Ctrl+C` in the El-Cheapo console.
-
-A `stop` command sets the shutdown flag and exits the command loop. `Ctrl+C` also publishes a final stopped heartbeat.
-
-## Supported MasterBot commands
-
-The current `mb-scan-command` sender supports:
-
-| Command              | Purpose                                                 |
-| -------------------- | ------------------------------------------------------- |
-| `start`              | Mark the scanner as running                             |
-| `stop`               | Request shutdown of the command loop                    |
-| `pause`              | Mark the scanner as paused                              |
-| `resume`             | Resume scanner operation                                |
-| `export_wl`          | Export the current ThinkOrSwim Watchlist                |
-| `suspend_exports`    | Suspend scheduled scanner and Watchlist exports         |
-| `resume_exports`     | Resume scheduled scanner and Watchlist exports          |
-| `replace_wl_symbols` | Replace the symbols in the personal `Default` Watchlist |
-| `add_wl_symbols`     | Add symbols to the personal `Default` Watchlist         |
-
-Example commands from MasterBot:
+From MasterBot:
 
 ```cmd
 mb-scan-command start --wait 10
-mb-scan-command export_wl --wait 10
-mb-scan-command suspend_exports --wait 10
-mb-scan-command resume_exports --wait 10
-mb-scan-command pause --wait 10
-mb-scan-command resume --wait 10
-mb-scan-command stop --wait 10
 ```
 
-Replace the Default Watchlist:
-
-```cmd
-mb-scan-command replace_wl_symbols --symbols AAPL MSFT NVDA --wait 10
-```
-
-Add symbols:
-
-```cmd
-mb-scan-command add_wl_symbols --symbols AMD,ORCL IBM --wait 10
-```
-
-Symbol input may be separated by spaces or commas. Symbols are:
-
-* converted to uppercase;
-* de-duplicated;
-* retained in first-seen order;
-* placed on the clipboard as newline-separated text.
-
-The ThinkOrSwim workflow selects the personal `Default` Watchlist, opens **Import**, selects either **Replace** or **Add**, chooses **Paste Symbols**, accepts the dialog, and verifies that the Symbols Import window closes.
-
-### Export suspension and Watchlist coordination
-
-`pause` and `suspend_exports` serve different purposes.
-
-`pause` pauses scanner runtime operation. `suspend_exports` leaves the command loop operational while preventing scheduled ThinkOrSwim exports from starting.
-
-The normal Watchlist replacement sequence is:
-
-1. `mb-scan-command suspend_exports --wait 10`
-2. `mb-scan-command replace_wl_symbols --symbols AAPL MSFT NVDA --wait 10`
-3. `mb-scan-command resume_exports --wait 10`
-
-Watchlist symbol replacement and addition remain permitted while exports are suspended.
-
-Explicit `export_wl` requests are also prevented from running while exports are suspended.
-
-The export-suspension state is persisted under the scanner command root. If the command-loop process stops and is restarted while exports are suspended, the new process restores the suspended state. Exports remain suspended until an explicit `resume_exports` command is processed.
-
-The scanner heartbeat reports this state using `exports_suspended`. A current heartbeat with `loop_state` equal to `exports_suspended` is a healthy operational state, not a scanner failure.
-
-### Meaning of `--wait`
-
-`mb-scan-command --wait` waits for the command file to reach either the `processed` or `failed` ingress directory.
-
-A `processed` result confirms that the command was accepted and submitted to the scanner job queue. It does not by itself prove that a longer ThinkOrSwim GUI action has finished. The heartbeat `current_job`, `loop_state`, and `last_job` fields provide additional runtime information.
-
-## Runtime flags
-
-The v2 dispatcher tracks:
-
-```text
-running
-paused
-exports_suspended
-shutdown_requested
-```
-
-A fresh heartbeat can therefore report:
-
-```text
-loop_state : idle
-running    : true
-paused     : false
-```
-
-or:
-
-```text
-loop_state : paused
-running    : true
-paused     : true
-```
-
-It is also possible to have:
-
-```text
-loop_state : idle
-running    : false
-```
-
-This means the command loop is alive and responsive, but a `start` command has not yet marked the scanner as running.
-
-## Scanner heartbeat
-
-`scan_command_loop.py` publishes:
-
-```text
-<command-root>\status\scanner_heartbeat.json
-```
-
-The default publication interval is five seconds. Important state transitions are published immediately.
-
-Typical heartbeat fields include:
-
-```json
-{
-  "application": "ToS_scanner",
-  "host": "El-Cheapo",
-  "pid": 24168,
-  "started_at_utc": "2026-07-26T08:23:19Z",
-  "heartbeat_at_utc": "2026-07-26T08:24:34Z",
-  "heartbeat_sequence": 20,
-  "heartbeat_interval_s": 5.0,
-  "loop_state": "idle",
-  "running": true,
-  "paused": false,
-  "shutdown_requested": false,
-  "current_job": null,
-  "last_job": {
-    "kind": "resume",
-    "command_id": "mb-resume-example",
-    "ok": true,
-    "message": "Scanner resumed.",
-    "error": null
-  }
-}
-```
-
-The heartbeat file is written to a temporary file and atomically replaced, preventing another computer from reading a partially written JSON document.
-
-### Heartbeat loop states
-
-| Loop state             | Meaning                                                   |
-| ---------------------- | --------------------------------------------------------- |
-| `waiting_for_operator` | Program started and is waiting for Enter                  |
-| `idle`                 | Command loop is polling and not currently executing a job |
-| `busy`                 | A command is being executed                               |
-| `paused`               | Scanner runtime state is paused                           |
-| `stopped`              | Loop exited or shutdown was requested                     |
-
-## Checking status from MasterBot
-
-With `MB_SCAN_CONTROL` set to the El-Cheapo share:
+Then:
 
 ```cmd
 mb-scan-status
 ```
 
-Example healthy result:
+A normal result resembles:
 
 ```text
 Scanner status : HEALTHY
-Host           : El-Cheapo
 Loop state     : idle
 Running        : yes
 Paused         : no
-Heartbeat age  : 1.2 seconds
+Exports suspended: no
+State health   : NORMAL
 ```
 
-Example paused result:
+Remember that this verifies the command-loop heartbeat, not the independent `scan_main_v2p0dev0.py` process.
 
-```text
-Scanner status : PAUSED
-Loop state     : paused
-Running        : yes
-Paused         : yes
-```
+---
 
-Example stopped result:
+# Supported MasterBot commands
 
-```text
-Scanner status : STOPPED
-Loop state     : stopped
-Running        : no
-Paused         : no
-```
+Current command/control operations include:
 
-Raw JSON status output is available with:
+| Command              | Purpose                                                |
+| -------------------- | ------------------------------------------------------ |
+| `start`              | Mark command-loop scanner state as running             |
+| `stop`               | Request shutdown of the command loop                   |
+| `pause`              | Mark runtime paused                                    |
+| `resume`             | Resume runtime                                         |
+| `export_wl`          | Explicitly export the current ThinkOrSwim Watchlist    |
+| `suspend_exports`    | Block scheduled WL/scan exports                        |
+| `resume_exports`     | Re-enable scheduled exports                            |
+| `replace_wl_symbols` | Replace membership of the personal `Default` Watchlist |
+| `add_wl_symbols`     | Add symbols to the personal `Default` Watchlist        |
+
+Examples:
 
 ```cmd
-mb-scan-status --json
+mb-scan-command start --wait 10
 ```
 
-## V2 output filenames
+```cmd
+mb-scan-command suspend_exports --wait 10
+```
 
-The v2 filename format is:
+```cmd
+mb-scan-command resume_exports --wait 10
+```
+
+```cmd
+mb-scan-command export_wl --wait 10
+```
+
+Replace Watchlist membership:
+
+```cmd
+mb-scan-command replace_wl_symbols --symbols AAPL MSFT NVDA --wait 30
+```
+
+Add symbols:
+
+```cmd
+mb-scan-command add_wl_symbols --symbols AMD ORCL IBM --wait 30
+```
+
+Symbol input may be separated by spaces or commas.
+
+The command path normalizes and de-duplicates symbols before placing newline-separated symbols on the clipboard for ThinkOrSwim import.
+
+---
+
+# Watchlist mutation
+
+ThinkOrSwim Watchlist mutation uses the personal:
 
 ```text
-YYYY-MM-DD-HH-MM-SS-XX.csv
+Default
+```
+
+Watchlist.
+
+The automated workflow opens the ThinkOrSwim Watchlist Import dialog and performs either:
+
+```text
+Replace
+```
+
+or:
+
+```text
+Add
+```
+
+using symbols placed on the Windows clipboard.
+
+The current coordinator architecture decides whether a downstream operation should be ADD or REPLACE.
+
+Producers such as Overnight Volume and Nasdaq LUDP/M do not directly make that decision.
+
+---
+
+# Known GUI hazard
+
+A critical GUI failure mode has been observed during Watchlist import.
+
+The scanner/control GUI can remain above ThinkOrSwim and partially cover the:
+
+```text
+Symbols Import
+```
+
+dialog.
+
+In that condition, an automated click may hit the scanner window instead of the intended ThinkOrSwim control.
+
+This can result in a command appearing to progress through part of the dialog without actually applying the intended Watchlist mutation.
+
+For this reason:
+
+* GUI visibility remains important;
+* Watchlist mutation is followed by explicit observation;
+* coordinator-driven workflows use full-target verification rather than trusting command acceptance alone.
+
+---
+
+# Scheduled exports
+
+Scheduled export timing is evaluated in New York market time.
+
+Current schedule:
+
+```text
+:05  Watchlist export (WL)
+:20  Watchlist export (WL)
+:35  Watchlist export (WL)
+:50  ThinkOrSwim scanner export (TS)
+```
+
+Example one-minute sequence:
+
+```text
+...-05-WL.csv
+...-20-WL.csv
+...-35-WL.csv
+...-50-TS.csv
 ```
 
 Current source codes include:
@@ -425,124 +572,621 @@ SA   Schwab API
 MA   Massive API
 ```
 
-Example Watchlist export:
+`TS`, `TM`, and `WL` are produced by `ToS_scanner`.
+
+`SA` and `MA` are expected to be produced by other MasterBot/LAN components.
+
+---
+
+# V2 filenames
+
+Current format:
 
 ```text
-2026-07-25-00-11-06-WL.csv
+YYYY-MM-DD-HH-MM-SS-XX.csv
 ```
 
-`TS`, `TM`, and `WL` files are produced by this scanner project. `SA` and `MA` files are expected to be produced elsewhere on the LAN.
-
-### Scheduled export routing
-
-Scheduled export slots are evaluated in New York market time.
-
-The current routing is:
-
-- `:05` -> ThinkOrSwim Watchlist export (`WL`)
-- `:20` -> ThinkOrSwim Watchlist export (`WL`)
-- `:35` -> ThinkOrSwim Watchlist export (`WL`)
-- `:50` -> ThinkOrSwim scanner export (`TS`)
-
-For example, during one minute the scheduled output may include filenames ending in:
-
-- `-05-WL.csv`
-- `-20-WL.csv`
-- `-35-WL.csv`
-- `-50-TS.csv`
-
-Both Watchlist and scanner scheduled exports use the shared export gate. When exports are suspended, neither type of scheduled ThinkOrSwim GUI export is allowed to begin.
-
-## Legacy v1 GUI
-
-The v1 Qt control panel is titled:
+Example:
 
 ```text
-JTM Scan Manager
+2026-08-27-09-30-05-WL.csv
 ```
 
-Its controls include:
+Times are intended to represent Eastern/New York market time for market-session workflows.
 
-| Control             | Purpose                                                |
-| ------------------- | ------------------------------------------------------ |
-| Output directory    | Select where CSV files are written                     |
-| Apply               | Apply the edited output directory                      |
-| Manual init         | Initialize and verify the ThinkOrSwim export directory |
-| Unlock ToS Scan     | Clear internal scan gating                             |
-| Press ToS Scan      | Press the ThinkOrSwim scan button                      |
-| Scan and Export CSV | Run an immediate scan and export                       |
-| Start Scan          | Start the scheduled scanner loop                       |
-| Stop Scan           | Gracefully stop the scheduled loop                     |
-| Exit Scan Manager   | Stop active work and exit the GUI                      |
+---
 
-Legacy hotkeys:
+# Export suspension
 
-| Hotkey       | Action                         |
-| ------------ | ------------------------------ |
-| `ESC`        | Stop the active scheduled loop |
-| `Ctrl+Alt+E` | Run Scan and Export CSV        |
-| `Ctrl+Alt+Q` | Exit Scan Manager              |
-
-The legacy entry point can be run with:
+MasterBot can temporarily prevent scheduled ThinkOrSwim exports:
 
 ```cmd
-python scan_main_v1p2.py --layout-path C:\Users\DanLa\Documents\github\pwidget_layouts\layout_scanner3_v1p1dev2.yaml
+mb-scan-command suspend_exports --wait 10
 ```
 
-## Tests and development checks
-
-Run the complete test suite:
+Resume them with:
 
 ```cmd
-python -m pytest -q
+mb-scan-command resume_exports --wait 10
 ```
 
-Compile the v2 command-loop components:
+This is distinct from:
+
+```text
+pause
+```
+
+`pause` changes command-loop runtime state.
+
+`suspend_exports` is specifically an export-collision control.
+
+The main use is protected Watchlist reconciliation:
+
+```text
+suspend scheduled exports
+        |
+        v
+perform explicit Watchlist action
+        |
+        v
+perform explicit verification export
+        |
+        v
+resume scheduled exports
+```
+
+This prevents a scheduled `WL` or `TS` export from colliding with coordinator-driven ThinkOrSwim GUI work.
+
+Watchlist mutation and the coordinator’s explicit verification flow remain available as controlled operations during protected reconciliation.
+
+---
+
+# Persisted export gate
+
+Export suspension is persisted under the scanner-control root.
+
+If the command loop exits while exports are suspended, a restarted command loop restores the suspended condition.
+
+This is fail-safe behavior.
+
+Exports remain suspended until MasterBot explicitly sends:
 
 ```cmd
-python -m py_compile scan_command_loop.py scanner_heartbeat.py file_command_ingress.py scan_dispatcher.py tos_scan_action_executor.py tos_pwidget_actions.py
+mb-scan-command resume_exports --wait 10
 ```
 
-Check Git whitespace:
+The heartbeat includes:
+
+```text
+exports_suspended
+exports_suspended_since_utc
+suspension_age_seconds
+suspension_command_id
+state_health
+```
+
+Long-lived suspension is reported separately from ordinary command-loop liveness.
+
+Current state-health concepts include:
+
+```text
+NORMAL
+WARNING
+DEGRADED
+```
+
+This helps identify cases where the scanner-control process is alive but exports have remained suspended unexpectedly.
+
+---
+
+# Protected Watchlist observation
+
+The MasterBot coordinator uses explicit Watchlist observation to determine what ThinkOrSwim actually contains.
+
+A typical protected observation is:
+
+```text
+MasterBot
+   |
+   v
+suspend scheduled exports
+   |
+   v
+explicit export_wl
+   |
+   v
+El-Cheapo local CSV
+   |
+   v
+resume scheduled exports
+   |
+   v
+evidence transport
+   |
+   v
+MasterBot parses observed symbols
+```
+
+This is deliberately stronger than assuming that a prior ADD or REPLACE command worked.
+
+---
+
+# Full-target verification
+
+The coordinator does not consider a mutation successful simply because:
+
+```text
+mb-scan-command
+```
+
+reports the command as processed.
+
+Instead, ThinkOrSwim is explicitly exported after the mutation and the complete observed symbol set is compared with the complete target.
+
+Verification checks:
+
+```text
+missing symbols
+unexpected symbols
+```
+
+Example:
+
+```text
+Desired    : 759
+Observed   : 760
+Missing    : 0
+Unexpected : 1
+```
+
+is considered a verification mismatch even though all requested symbols were present.
+
+This strict behavior is intentional.
+
+---
+
+# Command acceptance versus GUI completion
+
+`mb-scan-command --wait` waits for command-file processing.
+
+A result such as:
+
+```text
+Result : processed
+```
+
+means the command was accepted by the El-Cheapo command machinery.
+
+It should not by itself be interpreted as proof that every downstream GUI effect has been successfully verified.
+
+For coordinator workflows, verification evidence is authoritative.
+
+---
+
+# Watchlist verification evidence
+
+Coordinator-targeted Watchlist exports use a dedicated evidence path.
+
+The intended separation is:
+
+```text
+ThinkOrSwim GUI work
+        |
+        v
+local El-Cheapo export
+        |
+        v
+local verification staging
+        |
+        v
+release ThinkOrSwim
+        |
+        v
+LAN transport to MasterBot
+```
+
+This keeps LAN transport out of the GUI-critical section.
+
+Typical paths:
+
+## Local ThinkOrSwim export
+
+```text
+C:\Users\DanLa\Documents\github\stockScans\<file>.csv
+```
+
+## Local scanner-control verification outbox
+
+```text
+C:\Users\DanLa\Documents\github\stockScans_control\
+    outgoing\watchlist_verify\<file>.csv
+```
+
+## MasterBot view
+
+```text
+\\El-Cheapo\SCANCTRL\outgoing\watchlist_verify\<file>.csv
+```
+
+## Final MasterBot evidence
+
+```text
+%MB_SCANS%\watchlist_verify\<file>.csv
+```
+
+Transport and backlog recovery are currently implemented on the MasterBot side by `schwab_watchlists`.
+
+---
+
+# Evidence recovery
+
+`ToS_scanner` stages verification evidence locally.
+
+The companion MasterBot application can run:
+
+```cmd
+mb-wl-recovery
+```
+
+to recover staged evidence when LAN transport is temporarily unavailable.
+
+This architecture intentionally allows ThinkOrSwim GUI work to finish and scheduled exports to resume even if evidence transport is temporarily degraded.
+
+See the `schwab_watchlists` project for:
+
+```text
+tos_watchlist_transport.py
+tos_outbox_recovery.py
+mb-wl-recovery
+```
+
+---
+
+# Command-loop heartbeat
+
+`scan_command_loop.py` publishes:
+
+```text
+<command-root>\status\scanner_heartbeat.json
+```
+
+Default heartbeat interval is approximately five seconds, with important state transitions published immediately.
+
+Typical fields include:
+
+```text
+application
+host
+pid
+started_at_utc
+heartbeat_at_utc
+heartbeat_sequence
+heartbeat_interval_s
+loop_state
+running
+paused
+exports_suspended
+shutdown_requested
+current_job
+last_job
+state_health
+```
+
+Common loop states include:
+
+| State                  | Meaning                                                     |
+| ---------------------- | ----------------------------------------------------------- |
+| `waiting_for_operator` | Command loop started but operator has not enabled polling   |
+| `idle`                 | Polling and not executing a command                         |
+| `busy`                 | Executing a command                                         |
+| `paused`               | Logical command-loop scanner state is paused                |
+| `exports_suspended`    | Command loop alive; scheduled exports intentionally blocked |
+| `stopped`              | Shutdown requested or loop exited                           |
+
+---
+
+# Checking command-loop status
+
+On MasterBot:
+
+```cmd
+mb-scan-status
+```
+
+Example:
+
+```text
+Scanner status : HEALTHY
+Detail         : Scanner heartbeat is current.
+Host           : El-Cheapo
+Loop state     : idle
+Running        : yes
+Paused         : no
+Exports suspended: no
+State health   : NORMAL
+```
+
+Raw heartbeat JSON:
+
+```cmd
+mb-scan-status --json
+```
+
+Again: this reports the `scan_command_loop.py` heartbeat.
+
+It is not currently an independent health check of `scan_main_v2p0dev0.py`.
+
+---
+
+# Current Watchlist use in the POC
+
+The active MasterBot POC uses the ThinkOrSwim personal Watchlist as a downstream materialization target.
+
+The current producer architecture is:
+
+```text
+Overnight Volume
+     |
+     +--> BASE_SET
+               |
+               v
+       Canonical Watchlist
+               ^
+               |
+     +--> ENSURE_PRESENT
+     |
+Nasdaq LUDP/M
+               |
+               v
+         ThinkOrSwim
+```
+
+`ToS_scanner` does not own this policy.
+
+It only performs downstream GUI actions requested through the adapter/application layer.
+
+---
+
+# OV_DECISION
+
+For the current proof of concept, the ThinkOrSwim Watchlist can contain the custom column:
+
+```text
+OV_DECISION
+```
+
+A large candidate Watchlist is exported with current `OV_DECISION` values.
+
+MasterBot then:
+
+* reads those values;
+* combines them with live Schwab quote data;
+* ranks eligible candidates;
+* selects a smaller opening `BASE_SET`;
+* reconciles ThinkOrSwim to that target.
+
+Eventually, the intention is to move the richer historical Overnight Volume analytics to MasterBot rather than depend on a ToS custom expression.
+
+That future analytics work belongs primarily in `mb_market_data` and the producer/application layers, not in `ToS_scanner`.
+
+---
+
+# Tests
+
+The active v2 tests should be run while excluding archived historical material:
+
+```cmd
+pytest -q --ignore=docs\archive
+```
+
+The archived directory contains historical/debug test files that are not part of the current active suite.
+
+Current POC development has used this command as the authoritative active test run.
+
+Useful targeted checks include:
+
+```cmd
+python -m py_compile ^
+    scan_command_loop.py ^
+    scanner_heartbeat.py ^
+    file_command_ingress.py ^
+    scan_dispatcher.py ^
+    tos_scan_action_executor.py ^
+    tos_pwidget_actions.py
+```
+
+Check whitespace:
 
 ```cmd
 git diff --check
 ```
 
-A useful v2 smoke test is:
+---
+
+# Useful command-loop smoke test
+
+1. Start ThinkOrSwim.
+2. Start `scan_main_v2p0dev0.py`.
+3. Start `scan_command_loop.py`.
+4. Confirm the command-loop heartbeat is current.
+5. Send:
+
+```cmd
+mb-scan-command start --wait 10
+```
+
+6. Check:
+
+```cmd
+mb-scan-status
+```
+
+7. Test explicit Watchlist observation/export.
+8. Test a controlled ADD.
+9. Test a controlled REPLACE.
+10. Confirm scheduled exports resume.
+11. Confirm the command loop returns to `idle`.
+
+---
+
+# Export-gate restart smoke test
 
 1. Start `scan_command_loop.py`.
-2. Confirm `mb-scan-status` reports `WAITING`.
-3. Press Enter.
-4. Confirm status changes to `HEALTHY`.
-5. Send `start`.
-6. Confirm `Running: yes`.
-7. Send `pause`.
-8. Confirm status changes to `PAUSED`.
-9. Send `resume`.
-10. Export a Watchlist.
-11. Test Replace and Add Watchlist symbols.
-12. Send `stop`.
-13. Confirm status changes to `STOPPED`.
+2. Send:
 
-### Export-gate restart smoke test
+```cmd
+mb-scan-command suspend_exports --wait 10
+```
 
-A useful persistence test is:
+3. Confirm:
 
-1. Start `scan_command_loop.py` and allow it to reach its command loop.
-2. Send `suspend_exports`.
-3. Confirm `mb-scan-status` reports `Exports suspended: yes`.
-4. Stop the command loop without sending `resume_exports`.
+```text
+Exports suspended: yes
+```
+
+4. Stop the command loop without resuming exports.
 5. Restart `scan_command_loop.py`.
-6. Confirm the restarted process still reports `Exports suspended: yes`.
-7. Send `resume_exports`.
-8. Confirm the loop returns to `idle` and reports `Exports suspended: no`.
+6. Confirm suspension is restored.
+7. Send:
 
-This verifies that export suspension survives a command-loop process restart.
+```cmd
+mb-scan-command resume_exports --wait 10
+```
 
-## Repository notes
+8. Confirm:
 
-Generated or private files should not be committed:
+```text
+Exports suspended: no
+```
+
+This verifies that export suspension survives command-loop restart.
+
+---
+
+# Legacy v1 application
+
+The older entry point remains in the repository:
+
+```cmd
+python scan_main_v1p2.py
+```
+
+It represents the earlier scanner/control-panel architecture.
+
+Current POC development should use:
+
+```cmd
+python scan_main_v2p0dev0.py
+```
+
+together with:
+
+```cmd
+python scan_command_loop.py
+```
+
+unless working specifically on historical v1 behavior.
+
+Archived historical notes and debug material live under:
+
+```text
+docs\archive
+```
+
+---
+
+# Repository structure
+
+Important current files include:
+
+```text
+ToS_scanner/
+├── scan_main_v2p0dev0.py
+├── scan_command_loop.py
+├── config.py
+├── control_manager.py
+├── control_panel.py
+├── export_gate.py
+├── file_command_ingress.py
+├── scan_dispatcher.py
+├── scan_job_queue.py
+├── scan_jobs.py
+├── scan_output.py
+├── scanner_heartbeat.py
+├── scanner_logging.py
+├── tos_pwidget_actions.py
+├── tos_scan_action_executor.py
+├── tests/
+├── docs/
+│   └── archive/
+└── README.md
+```
+
+Exact supporting-module names may continue to evolve during v2 development.
+
+---
+
+# Current POC limitations
+
+The following are known and accepted for the current proof of concept:
+
+* ThinkOrSwim is controlled through GUI automation;
+* GUI geometry must match the pseudo-widget layout;
+* `scan_main_v2p0dev0.py` and `scan_command_loop.py` are separate processes;
+* `mb-scan-status` reports the command-loop heartbeat rather than both processes;
+* Watchlist import can fail if another window obscures the ThinkOrSwim dialog;
+* full-target verification is required because GUI command acceptance alone is insufficient;
+* normal scheduled export transport and coordinator verification transport serve different purposes;
+* some lifecycle and restart handling remain operator-driven;
+* the architecture is still changing.
+
+---
+
+# Post-POC upgrade backlog
+
+If the overall Watchlist coordinator concept is successful, important `ToS_scanner` work includes:
+
+## Merge scanner and command-loop processes
+
+Replace:
+
+```text
+scan_main_v2p0dev0.py
+        +
+scan_command_loop.py
+```
+
+with one production scanner service.
+
+## One authoritative status model
+
+Status should describe the actual scanner service rather than a command-loop proxy.
+
+## One GUI-action arbiter
+
+Scheduled exports and MasterBot-directed mutations should be serialized through one owner.
+
+## Better GUI collision protection
+
+Explicitly ensure ThinkOrSwim dialogs are visible and foregrounded before critical clicks.
+
+## Scan export consistency
+
+Watchlist exports explicitly set both filename and target directory.
+
+Scanner exports should eventually use similarly explicit destination handling where appropriate.
+
+## Production startup/shutdown
+
+Move from operator-started POC processes toward a deliberate trading-day lifecycle.
+
+These are production-hardening tasks and should not distract from the current OV + LUDP/M proof of concept.
+
+---
+
+# Generated/private files
+
+Do not commit:
 
 ```text
 .env
@@ -554,8 +1198,30 @@ client.log
 *.pyc
 ```
 
-Historical notes and older layout/debug references are stored under:
+Review generated scan/export data before adding anything to Git.
 
-```text
-docs\archive
-```
+---
+
+# Security
+
+This repository should not contain:
+
+* brokerage credentials;
+* API secrets;
+* passwords;
+* token files;
+* private account information.
+
+ThinkOrSwim automation should remain isolated from credential-management logic.
+
+---
+
+# Disclaimer
+
+This is an independent personal software project.
+
+It is not affiliated with or endorsed by Charles Schwab, ThinkOrSwim, Nasdaq, or any other market-data/trading provider.
+
+The software is intended for development and experimentation.
+
+It does not provide financial advice and does not place trades.
