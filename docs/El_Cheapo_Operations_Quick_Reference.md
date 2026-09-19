@@ -115,12 +115,16 @@ succeed.
 ### 2. Start and prepare ThinkOrSwim
 
 1. Start ThinkOrSwim and complete login.
-2. Open the expected main scanner window (`Main@thinkorswim`).
-3. Open the expected Watchlist window (`Watchlist Main@thinkorswim`).
-4. Select the personal `Default` Watchlist.
-5. Restore the window sizes and positions expected by the active pseudo-widget
+2. Select the personal ThinkOrSwim Setup named **Scanner3**.
+3. Confirm that `MB_PWIDGET_YAML` resolves to the pseudo-widget layout intended
+   for Setup **Scanner3**. Do not start automation when the selected Setup and
+   layout do not match.
+4. Open the expected main scanner window (`Main@thinkorswim`).
+5. Open the expected Watchlist window (`Watchlist Main@thinkorswim`).
+6. Select the personal `Default` Watchlist.
+7. Restore the window sizes and positions expected by the active pseudo-widget
    layout.
-6. Keep the JTM Scan Manager and unrelated windows away from ThinkOrSwim menus
+8. Keep the JTM Scan Manager and unrelated windows away from ThinkOrSwim menus
    and dialogs used by automation.
 
 The automation validates the main window's presence and dimensions when the
