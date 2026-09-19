@@ -2,6 +2,10 @@
 
 ThinkOrSwim GUI automation, scheduled CSV export, and remote Watchlist-control services for the MasterBot project.
 
+Day-to-day El-Cheapo startup, validation, shutdown, and recovery commands are
+maintained in the
+[El-Cheapo Operations Quick Reference](docs/El_Cheapo_Operations_Quick_Reference.md).
+
 > **Development status:** Active proof of concept on branch `scan_main_v2p0dev0`.
 >
 > The current POC uses two El-Cheapo Python processes:
