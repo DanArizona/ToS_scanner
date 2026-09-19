@@ -17,19 +17,26 @@ El-Cheapo commands on MasterBot.
 | ThinkOrSwim desktop | El-Cheapo | Owns the scanner and personal `Default` Watchlist GUI |
 | `scan_main_v2p0dev0.py` | El-Cheapo | Scheduled Watchlist and scanner exports; JTM Scan Manager |
 | `scan_command_loop.py` | El-Cheapo | Receives MasterBot commands, mutates/exports the Watchlist, publishes heartbeat |
+| `sync_csv_v2.exe` | El-Cheapo | Independently copies completed `TS`, `TM`, and `WL` CSVs to MasterBot |
+| `archive_scans.py` | El-Cheapo and MasterBot | Safely moves completed scan files into date-organized archive trees |
 | `mb-scan-command` | MasterBot | Sends commands to El-Cheapo |
 | `mb-scan-status` | MasterBot | Reads the El-Cheapo command-loop heartbeat |
 | OV/Focus production and market-data polling | MasterBot | Builds membership and records observations |
 
-The current proof of concept therefore requires three live applications on
+Normal production operation therefore requires four live applications on
 El-Cheapo:
 
 1. ThinkOrSwim.
 2. `scan_main_v2p0dev0.py`.
 3. `scan_command_loop.py`.
+4. `sync_csv_v2.exe`, normally started by
+   `sync_scans_to_masterbot_v2.cmd`.
 
 `mb-scan-status` proves that the command loop is alive. It does **not** prove
-that `scan_main_v2p0dev0.py` or ThinkOrSwim is alive.
+that `scan_main_v2p0dev0.py`, `sync_csv_v2.exe`, or ThinkOrSwim is alive.
+
+`archive_scans.py` is an end-of-day command, not a process left running during
+the market session.
 
 ## Time convention
 
@@ -58,6 +65,32 @@ including, 16:02:00 ET. Every minute:
 
 Files are named `YYYY-MM-DD-HH-MM-SS-XX.csv`, where `XX` is `WL`, `TS`, or
 `TM` for a manual scanner export.
+
+## One-time auxiliary utility setup
+
+If the transport and archive repositories are not yet present on El-Cheapo:
+
+```cmd
+cd /d C:\Users\DanLa\Documents\github
+git clone https://github.com/DanArizona/mb_synccsv.git
+git clone https://github.com/DanArizona/mb_archive_scans.git
+```
+
+Build the transport executable once:
+
+```cmd
+cd /d C:\Users\DanLa\Documents\github\mb_synccsv
+gcc -O2 -Wall -Wextra -municode -mconsole sync_csv_v2_20260830.c -o sync_csv_v2.exe
+```
+
+Create the selected El-Cheapo archive root:
+
+```cmd
+mkdir C:\Users\DanLa\Documents\github\stockScans_archive
+```
+
+The executable, logs, stop file, active scan CSVs, and archive data are local
+runtime artifacts. Do not commit them to a source repository.
 
 ## Before each trading day
 
@@ -157,7 +190,46 @@ Press Enter when ready...
 
 Until Enter is pressed, the heartbeat state is `waiting_for_operator`.
 
-### 5. Enable and validate remote control
+### 5. Start live CSV transport
+
+In a third El-Cheapo Command Prompt:
+
+```cmd
+cd /d C:\Users\DanLa\Documents\github\mb_synccsv
+sync_scans_to_masterbot_v2.cmd
+```
+
+The production transport copies completed ordinary scan files from:
+
+```text
+C:\Users\DanLa\Documents\github\stockScans
+```
+
+to:
+
+```text
+\\MasterBot\SCANS
+```
+
+It polls every five seconds, retries network outages, verifies copied bytes,
+never overwrites a different destination file, and never deletes or moves the
+El-Cheapo source file.
+
+The normal filter accepts only `TS`, `TM`, and `WL` filenames. Do not add
+`--all-csv` to the production launcher.
+
+If `sync_csv_v2.exe` is missing, build it once from the repository source using
+MinGW-w64:
+
+```cmd
+cd /d C:\Users\DanLa\Documents\github\mb_synccsv
+gcc -O2 -Wall -Wextra -municode -mconsole sync_csv_v2_20260830.c -o sync_csv_v2.exe
+```
+
+The source filename is `sync_csv_v2_20260830.c`; it is not the command used for
+normal daily startup.
+
+### 6. Enable and validate remote control
 
 Run these commands on **MasterBot**, not El-Cheapo:
 
@@ -178,18 +250,19 @@ State health      : NORMAL
 ```
 
 Then independently confirm on El-Cheapo that ThinkOrSwim, the JTM Scan Manager,
-and both Python console windows are present.
+both Python console windows, and the CSV transport console are present.
 
 ## Fast health checks
 
-### El-Cheapo: confirm both Python processes
+### El-Cheapo: confirm all automation processes
 
 ```cmd
-powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -match 'scan_main_v2p0dev0.py|scan_command_loop.py'} | Select-Object ProcessId,CommandLine | Format-Table -AutoSize"
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object {($_.Name -match 'python|sync_csv_v2') -and ($_.CommandLine -match 'scan_main_v2p0dev0.py|scan_command_loop.py|sync_csv_v2.exe')} | Select-Object ProcessId,Name,CommandLine | Format-Table -AutoSize"
 ```
 
-Expect one row for each script. This is a process check only; also inspect the
-JTM Scan Manager and ThinkOrSwim windows.
+Expect one row for each of the two Python scripts and one for
+`sync_csv_v2.exe`. This is a process check only; also inspect the JTM Scan
+Manager and ThinkOrSwim windows.
 
 ### El-Cheapo: inspect recent CSV output
 
@@ -201,6 +274,30 @@ During the production window, expect three `WL` files and one `TS` file per
 minute, subject to a deliberate export suspension or a recorded failure.
 
 Zero-byte, stale, missing, or irregularly timed files require investigation.
+
+### El-Cheapo: inspect CSV transport
+
+The transport log is:
+
+```text
+C:\Users\DanLa\Documents\github\mb_synccsv\sync_csv_v2.log
+```
+
+Inspect the newest entries:
+
+```cmd
+powershell -NoProfile -Command "Get-Content 'C:\Users\DanLa\Documents\github\mb_synccsv\sync_csv_v2.log' -Tail 30"
+```
+
+Inspect the newest files visible on MasterBot:
+
+```cmd
+powershell -NoProfile -Command "Get-ChildItem '\\MasterBot\SCANS\*.csv' | Sort-Object LastWriteTime -Descending | Select-Object -First 12 Name,Length,LastWriteTime | Format-Table -AutoSize"
+```
+
+An unreachable destination should cause retries, not stop local scanner
+production. A reported content conflict requires investigation; the transport
+will not overwrite the destination.
 
 ### El-Cheapo: inspect scanner state and logs
 
@@ -244,8 +341,9 @@ long even though the heartbeat itself is current.
 
 ## Routine operation
 
-Once started, leave the two El-Cheapo Python processes running and leave the
-required ThinkOrSwim windows available to automation.
+Once started, leave the two El-Cheapo Python processes and the CSV transport
+worker running, and leave the required ThinkOrSwim windows available to
+automation.
 
 The JTM Scan Manager hotkeys are:
 
@@ -336,10 +434,89 @@ mb-scan-status
 Alternatively, press `Ctrl+C` in the El-Cheapo command-loop console. Confirm
 the console reports that the v2 command loop stopped.
 
-### 4. Close ThinkOrSwim
+### 4. Confirm the final CSV reached MasterBot
+
+Compare the newest local and destination files:
+
+```cmd
+powershell -NoProfile -Command "$a=Get-ChildItem 'C:\Users\DanLa\Documents\github\stockScans\*.csv' | Sort-Object LastWriteTime -Descending | Select-Object -First 1; $b=Get-ChildItem '\\MasterBot\SCANS\*.csv' | Sort-Object LastWriteTime -Descending | Select-Object -First 1; 'LOCAL'; $a | Format-List Name,Length,LastWriteTime; 'MASTERBOT'; $b | Format-List Name,Length,LastWriteTime"
+```
+
+The latest filenames and lengths should agree. If they do not, leave the
+transport running and inspect `sync_csv_v2.log`.
+
+### 5. Stop live CSV transport
+
+In any El-Cheapo Command Prompt:
+
+```cmd
+cd /d C:\Users\DanLa\Documents\github\mb_synccsv
+sync_csv_v2_stop.cmd
+```
+
+This creates the worker's stop file. Wait for the transport console to report
+its exit code. Do not close the console merely because the stop file was
+written; shutdown may wait for an active scan, copy, verification, or network
+operation.
+
+### 6. Close ThinkOrSwim
 
 Close ThinkOrSwim only after the final scheduled/export evidence has been
-written and both automation processes have stopped.
+written, copied to MasterBot, and all three automation processes have stopped.
+
+## End-of-day El-Cheapo archival
+
+Run archival only after the scanner, command loop, and live CSV transport have
+stopped and the final MasterBot copy has been verified.
+
+The fixed El-Cheapo locations are:
+
+```text
+Source       C:\Users\DanLa\Documents\github\stockScans
+Archive root C:\Users\DanLa\Documents\github\stockScans_archive
+```
+
+The archive tree is organized as:
+
+```text
+C:\Users\DanLa\Documents\github\stockScans_archive\YYYY\MM\DD\
+```
+
+Use the market-session date explicitly. For example, first dry-run the
+2026-09-18 session:
+
+```cmd
+cd /d C:\Users\DanLa\Documents\github\mb_archive_scans
+conda activate sea-green
+python archive_scans.py --source C:\Users\DanLa\Documents\github\stockScans --archive-root C:\Users\DanLa\Documents\github\stockScans_archive --date 2026-09-18
+```
+
+Review every reported `WOULD_MOVE`, `DUPLICATE`, and `CONFLICT`. If the dry-run
+is correct and reports no conflict, perform the move by adding `--move`:
+
+```cmd
+python archive_scans.py --source C:\Users\DanLa\Documents\github\stockScans --archive-root C:\Users\DanLa\Documents\github\stockScans_archive --date 2026-09-18 --move
+```
+
+Change `2026-09-18` to the session being archived. Prefer `--date` over
+`--today`; the explicit date is reproducible and cannot silently select the
+wrong session after midnight.
+
+Safety behavior:
+
+- Dry-run is the default; no source file moves without `--move`.
+- A conflicting destination aborts the complete selected move batch before
+  any selected source is changed.
+- New destinations are copied to staging, SHA-256 verified, atomically renamed,
+  verified again, and only then removed from the active source directory.
+- An identical existing destination is treated as a duplicate; in move mode,
+  the redundant source is removed after equality is confirmed.
+- Only top-level files matching `YYYY-MM-DD-HH-MM-SS-??.csv` are eligible.
+- Never place the archive root inside the active `stockScans` source directory.
+
+MasterBot should run a separate archive operation against its own `MB_SCANS`
+directory after its archive root is standardized. Do not use the El-Cheapo
+archive directory as MasterBot's archive root.
 
 ## Recovery guide
 
@@ -394,6 +571,18 @@ Watchlist.
 4. Confirm `Exports suspended: no` and `State health: NORMAL`.
 5. Confirm new scheduled CSV files appear.
 
+### Local CSVs exist but MasterBot copies are stale
+
+1. Confirm `sync_csv_v2.exe` is running.
+2. Inspect the last 30 lines of `sync_csv_v2.log`.
+3. Confirm `\\MasterBot\SCANS` is reachable from El-Cheapo.
+4. Leave the source files in `stockScans`; do not move or delete them while the
+   transport is recovering.
+5. Allow the worker to retry. It treats an identical destination as delivered
+   and refuses to overwrite a different destination.
+6. If a conflict is reported, compare the two files before taking further
+   action.
+
 ## Change validation
 
 After changing El-Cheapo scanner code, run on El-Cheapo from the repository:
@@ -411,6 +600,20 @@ Then perform a controlled GUI smoke test outside a critical scheduled slot:
 5. Test a controlled REPLACE.
 6. Confirm full-target verification.
 7. Confirm scheduled exports resume and the command loop returns to `idle`.
+
+Validate the live transport separately in `mb_synccsv`:
+
+```cmd
+cd /d C:\Users\DanLa\Documents\github\mb_synccsv
+sync_csv_v2.exe --help
+```
+
+Validate archival separately in `mb_archive_scans`:
+
+```cmd
+cd /d C:\Users\DanLa\Documents\github\mb_archive_scans
+python -m pytest -q
+```
 
 ## Configuration and security
 
@@ -432,16 +635,27 @@ tracked scripts, `.cmd` files, logs, command JSON, or documentation. Use the
 encrypted configuration supported by the scanner or an untracked local
 environment file.
 
-The tracked `set_env.cmd` requires remediation because it currently contains
-plaintext credential material. Do not copy those values into new files. Rotate
-the affected credentials and remove the material from the tracked tree and Git
-history as a separate security operation.
+Until active Pushover credentials are available, leave notifications disabled:
+
+```text
+MB_NOTIFY_ENABLE=false
+```
+
+No dummy credential is required for normal scanner operation. If encrypted
+configuration loading itself needs to be tested, use dummy values such as
+`XXXX` only inside an untracked encrypted `.ecfg` file.
+
+The former tracked `set_env.cmd` contained plaintext credential material. It
+has been removed from the current tree and its filename is ignored. The old
+values must not be copied into a replacement file. History containing the
+removed file must be rewritten separately, after which existing clones will
+need controlled resynchronization.
 
 ## Known proof-of-concept limitations
 
 - ThinkOrSwim is controlled through screen coordinates and GUI state.
 - The scheduled scanner and command loop are separate processes.
-- No single heartbeat proves that all three El-Cheapo components are healthy.
+- No single heartbeat proves that all four live El-Cheapo components are healthy.
 - GUI actions can fail when windows move, resize, or obscure a target dialog.
 - Command acceptance is not the same as successful final-state verification.
 - Some startup, recovery, and shutdown work remains operator-driven.
