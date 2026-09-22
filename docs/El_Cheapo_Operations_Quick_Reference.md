@@ -377,9 +377,37 @@ operator can interpret console activity:
 
 `mb-scan-command --wait` means the command file was processed. It is not, by
 itself, proof that ThinkOrSwim reached the requested final state. Explicit
-Watchlist export and full-target comparison are authoritative.
+Watchlist export and full-target comparison apply only to retained diagnostic
+workflows.
 
-## Protected Watchlist update
+## Production display-only operation
+
+Run only the command loop for normal production display publication:
+
+```cmd
+cd /d C:\Users\DanLa\Documents\github\ToS_scanner
+python scan_command_loop.py --display-only
+```
+
+Then use MasterBot to mark the command-loop runtime as running. MasterBot sends
+complete Focus snapshots with `replace_wl_symbols`. ThinkOrSwim is not read
+back, and no Watchlist or scanner CSV is exported or ingested.
+
+Display-only mode persistently blocks scheduled exports and rejects
+`export_wl`, scanner exports, `add_wl_symbols`, and `resume_exports`. Do not
+start `scan_main_v2p0dev0.py` during routine display-only operation. Start the
+older scanner/export process only for a deliberate diagnostic session outside
+display-only mode.
+
+The console result means the GUI submission sequence returned without raising
+an error. Membership is explicitly unverified. A stale or extra ToS symbol is
+a display defect and does not alter MasterBot's canonical hierarchy or API
+journal.
+
+## Legacy protected Watchlist update
+
+This procedure is retained only for troubleshooting ThinkOrSwim. It is not a
+production startup or data-collection requirement.
 
 The normal BASE_SET/Focus update is coordinated from MasterBot. The intended
 sequence is:

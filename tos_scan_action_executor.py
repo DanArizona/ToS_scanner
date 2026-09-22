@@ -128,13 +128,17 @@ class ToSScanActionExecutor(NoOpScanActionExecutor):
             if self.dry_run:
                 if mode == "replace":
                     message = (
-                        f"DRY RUN: would replace Default WL with "
-                        f"{symbol_count} {symbol_word}."
+                        "DRY RUN: would submit a "
+                        f"{symbol_count}-symbol full "
+                        "display snapshot to Default WL; "
+                        "membership would not be verified."
                     )
                 else:
                     message = (
-                        f"DRY RUN: would add {symbol_count} {symbol_word} "
-                        f"to Default WL."
+                        "DRY RUN: would submit an add "
+                        f"display update with {symbol_count} "
+                        f"{symbol_word} to Default WL; "
+                        "membership would not be verified."
                     )
 
                 self._log_info(message)
@@ -167,13 +171,15 @@ class ToSScanActionExecutor(NoOpScanActionExecutor):
 
         if mode == "replace":
             message = (
-                f"Replaced Default WL with "
-                f"{symbol_count} {symbol_word}."
+                f"Submitted a {symbol_count}-symbol "
+                "full display snapshot to Default WL; "
+                "membership not verified."
             )
         else:
             message = (
-                f"Added {symbol_count} {symbol_word} "
-                f"to Default WL."
+                "Submitted an add display update with "
+                f"{symbol_count} {symbol_word} to Default WL; "
+                "membership not verified."
             )
 
         self._log_info(message)
@@ -477,4 +483,3 @@ class ToSScanActionExecutor(NoOpScanActionExecutor):
     def _log_error(self, message: str) -> None:
         if self.logger is not None:
             self.logger.error(message)
-

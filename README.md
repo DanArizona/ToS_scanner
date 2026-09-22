@@ -438,6 +438,31 @@ Remember that this verifies the command-loop heartbeat, not the independent `sca
 
 ---
 
+# Production display-only mode
+
+The production role of ThinkOrSwim is outbound display only. Schwab API data
+and the MasterBot schema-v2 journal remain authoritative. Start the El-Cheapo
+command loop with:
+
+```cmd
+python scan_command_loop.py --display-only
+```
+
+This mode persistently suspends scheduled Watchlist and scanner exports. It
+permits lifecycle commands and `replace_wl_symbols`, which publishes the latest
+complete Focus snapshot to the personal `Default` Watchlist. It rejects
+`export_wl`, scanner exports, `add_wl_symbols`, and `resume_exports`.
+
+Do not run `scan_main_v2p0dev0.py` for the normal display-only workflow. The
+older scheduled exporter and explicit export capability remain available only
+for an intentional diagnostic session started without `--display-only`.
+
+A submitted display update is not read back from ThinkOrSwim. It can affect the
+human-facing display, but it cannot change Uni, Focus, Hot, `OV_DECISION`, or
+the API journal.
+
+---
+
 # Supported MasterBot commands
 
 Current command/control operations include:
@@ -453,6 +478,10 @@ Current command/control operations include:
 | `resume_exports`     | Re-enable scheduled exports                            |
 | `replace_wl_symbols` | Replace membership of the personal `Default` Watchlist |
 | `add_wl_symbols`     | Add symbols to the personal `Default` Watchlist        |
+
+In production display-only mode, only `start`, `stop`, `pause`, `resume`,
+`suspend_exports`, and `replace_wl_symbols` are permitted. The broader table
+documents retained diagnostic compatibility outside that mode.
 
 Examples:
 
@@ -717,6 +746,9 @@ This is deliberately stronger than assuming that a prior ADD or REPLACE command 
 
 # Full-target verification
 
+> **Legacy diagnostic workflow:** this section is retained for investigating
+> ThinkOrSwim itself. It is not part of the production display-only data path.
+
 The coordinator does not consider a mutation successful simply because:
 
 ```text
@@ -763,7 +795,9 @@ means the command was accepted by the El-Cheapo command machinery.
 
 It should not by itself be interpreted as proof that every downstream GUI effect has been successfully verified.
 
-For coordinator workflows, verification evidence is authoritative.
+For the historical reconciliation workflow, verification evidence is
+authoritative. Production display-only publication deliberately performs no
+ToS readback; canonical MasterBot membership remains authoritative.
 
 ---
 

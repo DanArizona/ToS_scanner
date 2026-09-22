@@ -105,7 +105,10 @@ def test_replace_wl_symbols_normalizes_and_calls_controller(
 
     assert result.ok is True
     assert result.error is None
-    assert result.message == "Replaced Default WL with 3 symbols."
+    assert result.message == (
+        "Submitted a 3-symbol full display snapshot to Default WL; "
+        "membership not verified."
+    )
     assert controller.replace_calls == ["AAPL\nMSFT\nNVDA"]
     assert controller.add_calls == []
 
@@ -127,7 +130,10 @@ def test_add_wl_symbols_normalizes_and_calls_controller(
 
     assert result.ok is True
     assert result.error is None
-    assert result.message == "Added 3 symbols to Default WL."
+    assert result.message == (
+        "Submitted an add display update with 3 symbols to Default WL; "
+        "membership not verified."
+    )
     assert controller.add_calls == ["TSLA\nAMD\nNVDA"]
     assert controller.replace_calls == []
 
@@ -175,7 +181,8 @@ def test_symbol_change_dry_run_does_not_require_controller(
     assert result.ok is True
     assert result.error is None
     assert result.message == (
-        "DRY RUN: would add 2 symbols to Default WL."
+        "DRY RUN: would submit an add display update with 2 symbols "
+        "to Default WL; membership would not be verified."
     )
 
 
@@ -239,7 +246,10 @@ def test_add_wl_symbols_uses_singular_word_for_one_symbol(
 
     assert result.ok is True
     assert result.error is None
-    assert result.message == "Added 1 symbol to Default WL."
+    assert result.message == (
+        "Submitted an add display update with 1 symbol to Default WL; "
+        "membership not verified."
+    )
     assert controller.add_calls == ["AMD"]
     assert controller.replace_calls == []
 

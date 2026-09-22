@@ -21,7 +21,7 @@ from scan_dispatcher import (
     ScanRuntimeFlags,
 )
 from scan_job_queue import ScanJobQueue
-from scan_jobs import JobKind, JobResult
+from scan_jobs import JobKind, JobRequest, JobResult
 from scanner_heartbeat import (
     ScannerHeartbeatPublisher,
 )
@@ -47,6 +47,20 @@ UI_ACTION_JOBS = {
     JobKind.ADD_WL_SYMBOLS,
 }
 
+DISPLAY_ONLY_SUSPENSION_COMMAND_ID = (
+    "display-only-mode"
+)
+DISPLAY_ONLY_ALLOWED_JOBS = frozenset(
+    {
+        JobKind.START,
+        JobKind.STOP,
+        JobKind.PAUSE,
+        JobKind.RESUME,
+        JobKind.SUSPEND_EXPORTS,
+        JobKind.REPLACE_WL_SYMBOLS,
+    }
+)
+
 
 def parse_args(
     argv: Sequence[str] | None = None,
@@ -65,6 +79,17 @@ def parse_args(
             "MB_SCAN_CONTROL when set, "
             "otherwise uses the local "
             "development root."
+        ),
+    )
+    parser.add_argument(
+        "--display-only",
+        action="store_true",
+        help=(
+            "Run ToS as an outbound display adapter. "
+            "Scheduled exports remain suspended; "
+            "only lifecycle commands and full "
+            "replace_wl_symbols display snapshots "
+            "are accepted."
         ),
     )
 
@@ -212,6 +237,17 @@ def _suspension_heartbeat_metadata(
     )
 
     if (
+        command_id
+        == DISPLAY_ONLY_SUSPENSION_COMMAND_ID
+    ):
+        return (
+            suspended_since,
+            age_seconds,
+            command_id,
+            "NORMAL",
+        )
+
+    if (
         age_seconds
         >= SUSPENSION_DEGRADED_SECONDS
     ):
@@ -229,6 +265,26 @@ def _suspension_heartbeat_metadata(
         age_seconds,
         command_id,
         state_health,
+    )
+
+
+def _display_only_rejection(
+    request: JobRequest,
+) -> JobResult:
+    """Reject commands outside the display-only contract."""
+
+    return JobResult(
+        request=request,
+        ok=False,
+        message=(
+            "Display-only mode rejected "
+            f"{request.kind.value}. Only lifecycle "
+            "commands and replace_wl_symbols full "
+            "display snapshots are permitted; ToS "
+            "exports and incremental additions are "
+            "disabled."
+        ),
+        error="Command is disabled in display-only mode.",
     )
 
 
@@ -376,7 +432,7 @@ def _wait_for_operator(
             "  3. It is okay if File Explorer, "
             "VS Code, or the browser is in "
             "front;\n"
-            "     each export action will "
+            "     each GUI action will "
             "surface its target ToS window when "
             "needed.\n"
             "  4. Drop JSON command files into "
@@ -439,6 +495,11 @@ def main(
     heartbeat = ScannerHeartbeatPublisher(
         command_root=command_root,
         interval_s=5.0,
+        operating_mode=(
+            "display_only"
+            if args.display_only
+            else "scanner"
+        ),
     )
 
     last_result: JobResult | None = None
@@ -450,6 +511,21 @@ def main(
         cfg=cfg,
         logger=logger,
     )
+
+    if args.display_only:
+        export_gate.suspend(
+            command_id=(
+                DISPLAY_ONLY_SUSPENSION_COMMAND_ID
+            ),
+            refresh_existing=True,
+        )
+        flags.exports_suspended = True
+        logger.info(
+            "Display-only mode enabled. Scheduled "
+            "exports are persistently suspended; "
+            "ToS is an outbound, unverified display "
+            "adapter."
+        )
 
     try:
         _wait_for_operator(
@@ -586,9 +662,24 @@ def main(
                             USER_CLEAR_DELAY_S
                         )
 
-                    result = (
-                        dispatcher.execute(job)
-                    )
+                    if (
+                        args.display_only
+                        and job.kind
+                        not in DISPLAY_ONLY_ALLOWED_JOBS
+                    ):
+                        result = (
+                            _display_only_rejection(
+                                job
+                            )
+                        )
+                        logger.warning(
+                            "%s",
+                            result.message,
+                        )
+                    else:
+                        result = (
+                            dispatcher.execute(job)
+                        )
                     last_result = result
 
                     print()

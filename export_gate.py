@@ -396,6 +396,7 @@ class ExportGate:
         command_id: str | None,
         timeout_s: float = 30.0,
         poll_s: float = 0.05,
+        refresh_existing: bool = False,
     ) -> ExportGateSnapshot:
         """
         Wait for any active export and establish persistent suspension.
@@ -421,7 +422,11 @@ class ExportGate:
 
         current = self.snapshot()
 
-        if current.suspended and current.error is None:
+        if (
+            current.suspended
+            and current.error is None
+            and not refresh_existing
+        ):
             return current
 
         updated = ExportGateSnapshot(

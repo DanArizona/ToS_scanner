@@ -94,6 +94,26 @@ def test_suspended_state_survives_controller_close(
     assert second.is_suspended() is False
 
 
+def test_suspend_can_refresh_existing_suspension_metadata(
+    tmp_path: Path,
+) -> None:
+    gate = ExportGate(tmp_path)
+
+    first = gate.suspend(
+        command_id="temporary-maintenance",
+    )
+    refreshed = gate.suspend(
+        command_id="display-only-mode",
+        refresh_existing=True,
+    )
+
+    assert refreshed.suspended is True
+    assert refreshed.generation == first.generation + 1
+    assert refreshed.command_id == "display-only-mode"
+
+    gate.close()
+
+
 def test_action_lock_is_cross_process(
     tmp_path: Path,
 ) -> None:

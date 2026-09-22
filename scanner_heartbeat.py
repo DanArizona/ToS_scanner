@@ -49,6 +49,7 @@ class ScannerHeartbeatPublisher:
     heartbeat_filename: str = (
         "scanner_heartbeat.json"
     )
+    operating_mode: str = "scanner"
     replace_retry_attempts: int = 6
     replace_retry_initial_delay_s: float = (
         0.05
@@ -166,6 +167,9 @@ class ScannerHeartbeatPublisher:
             "schema_version": 1,
             "application": (
                 self.application_name
+            ),
+            "operating_mode": (
+                self.operating_mode
             ),
             "host": socket.gethostname(),
             "pid": os.getpid(),

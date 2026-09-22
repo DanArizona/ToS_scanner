@@ -8,6 +8,7 @@ import pytest
 
 from export_gate import ExportGateSnapshot
 from scan_command_loop import (
+    DISPLAY_ONLY_SUSPENSION_COMMAND_ID,
     _publish_heartbeat,
     _publish_stopped_heartbeat,
     _wait_for_operator,
@@ -146,6 +147,56 @@ def test_publish_heartbeat_derives_degraded_suspension_metadata(
         call["state_health"]
         == "DEGRADED"
     )
+
+
+def test_display_only_suspension_remains_healthy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    heartbeat = RecordingHeartbeat()
+    flags = ScanRuntimeFlags(
+        exports_suspended=True
+    )
+    snapshot = ExportGateSnapshot(
+        suspended=True,
+        generation=1,
+        updated_at_utc=(
+            "2026-08-21T15:00:00Z"
+        ),
+        command_id=(
+            DISPLAY_ONLY_SUSPENSION_COMMAND_ID
+        ),
+    )
+
+    class FakeExportGate:
+        def snapshot(
+            self,
+        ) -> ExportGateSnapshot:
+            return snapshot
+
+    monkeypatch.setattr(
+        "scan_command_loop._utc_now",
+        lambda: datetime(
+            2026,
+            8,
+            21,
+            16,
+            0,
+            0,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    _publish_heartbeat(
+        heartbeat=heartbeat,  # type: ignore[arg-type]
+        export_gate=FakeExportGate(),  # type: ignore[arg-type]
+        flags=flags,
+        loop_state="exports_suspended",
+    )
+
+    call = heartbeat.calls[0]
+
+    assert call["state_health"] == "NORMAL"
+    assert call["suspension_age_seconds"] == 3600.0
 
 
 def test_publish_heartbeat_derives_warning_suspension_metadata(
